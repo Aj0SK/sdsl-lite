@@ -284,6 +284,186 @@ class binomial31
         }
 };
 
+class binomial63
+{
+    public:
+        typedef uint64_t number_type;
+    private:
+        static class impl
+        {
+            public:
+                std::array<uint64_t, 64> m_bin_30 = {0};
+                std::array<uint64_t, 64> m_bin_60 = {0};
+                std::array<uint64_t, 64> m_bin_61 = {0};
+                std::array<uint64_t, 64> m_bin_62 = {0};
+
+                std::array<std::array<uint64_t, 31>, 64> helper;
+
+                uint32_t m_space_for_bt[64];
+
+                impl()
+                {
+                    binomial_table<63, uint64_t> m_bin_table;
+                    for (uint64_t i = 0; i <= 30; ++i)
+                        m_bin_30[i] = m_bin_table.data.table[30][i];
+
+                    for (uint64_t i = 0; i <= 60; ++i)
+                        m_bin_60[i] = m_bin_table.data.table[60][i];
+
+                    for (uint64_t i = 0; i <= 61; ++i)
+                        m_bin_61[i] = m_bin_table.data.table[61][i];
+
+                    for (uint64_t i = 0; i <= 62; ++i)
+                        m_bin_62[i] = m_bin_table.data.table[62][i];
+
+                    for (uint64_t i = 0; i < 64; ++i)
+                    {
+                        uint64_t class_cnt = m_bin_table.data.table[63][i];
+                        if (class_cnt == 1)
+                            m_space_for_bt[i] = 0;
+                        else
+                            m_space_for_bt[i] = bits::hi(class_cnt) + 1;
+                    }
+
+                    for (size_t k = 0; k < 64; ++k)
+                    {
+                        std::fill(helper[k].begin(), helper[k].end(), 0);
+                        uint64_t total = 0;
+                        for (size_t ones_in_big = (k > 30) ? (k - 30) : 0;
+                            ones_in_big <= std::min(k, static_cast<size_t>(30)); ++ones_in_big)
+                        {
+                            helper[k][ones_in_big] = total;
+                            total += m_bin_30[ones_in_big] * m_bin_30[k - ones_in_big];
+                        }
+                    }
+                } // impl() end
+        } iii;
+
+        public:
+            static inline uint64_t nr_to_bin(uint8_t k, uint64_t nr)
+            {
+            #ifndef NO_MY_OPT
+                if (k == 63)
+                {
+                    return (1ull << 63) - 1;
+                }
+                else if (k == 0)
+                {
+                    return 0;
+                }
+                else if (k == 1)
+                {
+                    return (nr >= 60) ? (1ull << nr) : (1ull << (60 - nr - 1));
+                }
+            #endif
+                uint64_t to_or = 0;
+                const bool first_bit = (nr >= iii.m_bin_62[k]);
+                if (first_bit)
+                {
+                    nr -= iii.m_bin_62[k];
+                    --k;
+                    to_or |= 1ull << 62;
+                }
+                const bool second_bit = (nr >= (iii.m_bin_61[k]));
+                if (second_bit)
+                {
+                    nr -= iii.m_bin_61[k];
+                    --k;
+                    to_or |= 1ull << 61;
+                }
+                const bool third_bit = (nr >= (iii.m_bin_60[k]));
+                if (third_bit)
+                {
+                    nr -= iii.m_bin_60[k];
+                    --k;
+                    to_or |= 1ull << 60;
+                }
+
+                const size_t right_k_from = (k > 30) ? (k - 30) : 0;
+                const size_t right_k_to = std::min(k, static_cast<uint8_t>(30));
+
+                size_t right_k = right_k_from;
+                for (; right_k < right_k_to; ++right_k)
+                {
+                    if (auto curr_index = iii.helper[k][right_k + 1]; curr_index >= nr)
+                    {
+                        if (curr_index == nr)
+                        ++right_k;
+                        break;
+                    }
+                }
+
+                nr -= iii.helper[k][right_k];
+
+                const size_t left_k = k - right_k;
+
+                const uint64_t left_bin =
+                    binomial31::nr_to_bin_30(left_k, nr % iii.m_bin_30[left_k]);
+                const uint64_t right_bin =
+                    binomial31::nr_to_bin_30(right_k, nr / iii.m_bin_30[left_k]);
+
+                return to_or | (left_bin << 30) | right_bin;
+            }
+
+            static inline uint64_t bin_to_nr(const uint64_t bin)
+            {
+            #ifndef NO_MY_OPT
+                if ((bin == 0) || (bin == ((1ull << 63) - 1)))
+                {
+                    return 0;
+                }
+            #endif
+                const uint64_t k = __builtin_popcountll(bin);
+                bool first_bit = bin & (1ull << 62);
+                bool second_bit = bin & (1ull << 61);
+                bool third_bit = bin & (1ull << 60);
+
+                uint64_t nr = first_bit * iii.m_bin_62[k] +
+                                second_bit * iii.m_bin_61[k - first_bit] +
+                                third_bit * iii.m_bin_60[k - first_bit - second_bit];
+
+                const uint64_t rem_k = k - first_bit - second_bit - third_bit;
+
+                // 1073741823_10 = 111111111111111111111111111111_2
+                const uint32_t left_bin = (bin >> 30) & 1073741823ull;
+                const uint32_t right_bin = bin & 1073741823ull;
+                const uint32_t left_k = __builtin_popcount(left_bin);
+                const uint32_t right_k = __builtin_popcount(right_bin);
+
+                nr += iii.helper[rem_k][right_k];
+                nr += iii.m_bin_30[left_k] * binomial31::bin_to_nr_30(right_bin);
+                nr += binomial31::bin_to_nr_30(left_bin);
+
+                return nr;
+            }
+
+            static inline uint32_t space_for_bt(uint32_t i)
+            {
+                return iii.m_space_for_bt[i];
+            }
+
+            //! Decode the bit at position \f$ off \f$ of the block encoded by the pair
+            //! (k, nr).
+            static inline bool decode_bit(uint16_t k, number_type nr, uint16_t off)
+            {
+            #ifndef NO_MY_OPT
+                if (k == 63)
+                {
+                    return 1;
+                }
+                else if (k == 0)
+                {
+                    return 0;
+                }
+                else if (k == 1)
+                {
+                    return (nr >= 60) ? (nr == off) : ((60 - nr - 1) == off);
+                }
+            #endif
+                return (nr_to_bin(k, nr) >> off) & static_cast<uint64_t>(1);
+            }
+};
+
 }// end namespace sdsl
 
 #endif

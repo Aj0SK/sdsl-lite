@@ -15,16 +15,18 @@
     along with this program.  If not, see http://www.gnu.org/licenses/ .
 */
 /*! \file rrr_vector.hpp
-   \brief rrr_vector.hpp contains the sdsl::rrr_vector class, and
-          classes which support rank and select for rrr_vector.
-   \author Simon Gog, Matthias Petri
+   \brief rrr_vector.hpp contains a specialisation of the sdsl::rrr_vector class,
+          with block size k=63
+   \author Andrej Korman, Jakub Kovac
 */
-#ifndef INCLUDED_SDSL_RRR_VECTOR
-#define INCLUDED_SDSL_RRR_VECTOR
+#ifndef INCLUDED_SDSL_RRR_VECTOR_63
+#define INCLUDED_SDSL_RRR_VECTOR_63
 
 #include "int_vector.hpp"
 #include "util.hpp"
 #include "rrr_helper.hpp" // for binomial helper class
+#include "rrr_vector.hpp"
+#include "rrr_vector_spec_helpers.hpp"
 #include "iterators.hpp"
 #include <vector>
 #include <algorithm> // for next_permutation
@@ -34,47 +36,14 @@
 namespace sdsl
 {
 
-// forward declaration needed for friend declaration
-template<uint8_t t_b=1, uint16_t t_bs=15, class t_rac=int_vector<>, uint16_t t_k=32>
-class rank_support_rrr;                // in rrr_vector
-
-// forward declaration needed for friend declaration
-template<uint8_t t_b=1, uint16_t t_bs=15, class t_rac=int_vector<>, uint16_t t_k=32>
-class select_support_rrr;                // in rrr_vector
-
-//! A \f$H_0f$-compressed bitvector representation.
-/*!
- *   \tparam t_bs   Size of a basic block.
- *   \tparam t_rac  Random access integer vector. Use to store the block types.
- *                  It is possible to use WTs for t_rac.
- *   \tparam t_k    A rank sample value is stored before every t_k-th basic block.
- *
- *   References:
- *    - Rasmus Pagh
- *      Low redundancy in dictionaries with O(1) worst case lookup time
- *      Technical Report 1998.
- *      ftp://ftp.cs.au.dk/BRICS/Reports/RS/98/28/BRICS-RS-98-28.pdf, Section 2.
- *    - Rajeev Raman, V. Raman and S. Srinivasa Rao
- *      Succinct Indexable Dictionaries with Applications to representations
- *      of k-ary trees and multi-sets.
- *      SODA 2002.
- *    - Francisco Claude, Gonzalo Navarro:
- *      Practical Rank/Select Queries over Arbitrary Sequences.
- *      SPIRE 2008: 176-187
- *    - On the fly-decoding and encoding was discovered in;
- *      Gonzalo Navarro, Eliana Providel:
- *      Fast, Small, Simple Rank/Select on Bitmaps.
- *      SEA 2012
- *
- *    In this version the block size can be adjust by the template parameter t_bs!
- *    \sa sdsl::rrr_vector for a specialized version for block_size=15
- */
-template<uint16_t t_bs=63, class t_rac=int_vector<>, uint16_t t_k=32>
-class rrr_vector
+//! A specialization of the rrr_vector class for a block_size of 63.
+template<class t_rac, uint16_t t_k>
+class rrr_vector<63, t_rac, t_k>
 {
-        static_assert(t_bs >= 3 and t_bs <= 256 , "rrr_vector: block size t_bs must be 3 <= t_bs <= 256.");
         static_assert(t_k > 1, "rrr_vector: t_k must be > 0.");
     public:
+        static const uint16_t t_bs = 63;
+
         typedef bit_vector::size_type                    size_type;
         typedef bit_vector::value_type                   value_type;
         typedef bit_vector::difference_type              difference_type;
@@ -97,6 +66,7 @@ class rrr_vector
         typedef typename rrr_helper_type::number_type number_type;
 
         enum { block_size = t_bs };
+        typedef binomial63 bi_type;
     private:
         size_type    m_size = 0;  // Size of the original bit_vector.
         rac_type     m_bt;     // Vector for the block types (bt). bt equals the
@@ -158,13 +128,13 @@ class rrr_vector
             while (pos + t_bs <= m_size) { // handle all blocks full blocks
                 bt_array[ i++ ] = x = rrr_helper_type::get_bt(bv, pos, t_bs);
                 sum_rank += x;
-                btnr_pos += rrr_helper_type::space_for_bt(x);
+                btnr_pos += bi_type::space_for_bt(x);
                 pos += t_bs;
             }
             if (pos < m_size) { // handle last not full block
                 bt_array[ i++ ] = x = rrr_helper_type::get_bt(bv, pos, m_size - pos);
                 sum_rank += x;
-                btnr_pos += rrr_helper_type::space_for_bt(x);
+                btnr_pos += bi_type::space_for_bt(x);
             }
             m_btnr  = bit_vector(std::max(btnr_pos, (size_type)64), 0);      // max necessary for case: t_bs == 1
             m_btnrp = int_vector<>((bt_array.size()+t_k-1)/t_k, 0,  bits::hi(btnr_pos)+1);
@@ -201,11 +171,11 @@ class rrr_vector
                         invert = false;
                     }
                 }
-                uint16_t space_for_bt = rrr_helper_type::space_for_bt(x=bt_array[i++]);
+                uint16_t space_for_bt = bi_type::space_for_bt(x=bt_array[i++]);
                 sum_rank += (invert ? (t_bs - x) : x);
                 if (space_for_bt) {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
-                    number_type nr = rrr_helper_type::bin_to_nr(bin);
+                    number_type nr = bi_type::bin_to_nr(bin);
                     rrr_helper_type::set_bt(m_btnr, btnr_pos, nr, space_for_bt);
                 }
                 btnr_pos += space_for_bt;
@@ -218,13 +188,13 @@ class rrr_vector
                     m_invert[ i/t_k ] = 0; // default: set last block to not inverted
                     invert = false;
                 }
-                uint16_t space_for_bt = rrr_helper_type::space_for_bt(x=bt_array[i++]);
+                uint16_t space_for_bt = bi_type::space_for_bt(x=bt_array[i++]);
 //          no extra dummy block added to bt_array, therefore this condition should hold
                 assert(i == bt_array.size());
                 sum_rank += invert ? (t_bs - x) : x;
                 if (space_for_bt) {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, m_size-pos);
-                    number_type nr = rrr_helper_type::bin_to_nr(bin);
+                    number_type nr = bi_type::bin_to_nr(bin);
                     rrr_helper_type::set_bt(m_btnr, btnr_pos, nr, space_for_bt);
                 }
                 btnr_pos += space_for_bt;
@@ -269,11 +239,11 @@ class rrr_vector
             uint16_t off = i % t_bs; //i - bt_idx*t_bs;
             size_type btnrp = m_btnrp[ sample_pos ];
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
-                btnrp += rrr_helper_type::space_for_bt(m_bt[j]);
+                btnrp += bi_type::space_for_bt(m_bt[j]);
             }
-            uint16_t btnrlen = rrr_helper_type::space_for_bt(bt);
+            uint16_t btnrlen = bi_type::space_for_bt(bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
-            return rrr_helper_type::decode_bit(bt, btnr, off);
+            return bi_type::decode_bit(bt, btnr, off);
         }
 
         //! Get the integer value of the binary string of length len starting at position idx.
@@ -302,11 +272,11 @@ class rrr_vector
                 } else {
                     size_type btnrp = m_btnrp[ sample_pos ];
                     for (size_type j = sample_pos*t_k; j < bb_idx; ++j) {
-                        btnrp += rrr_helper_type::space_for_bt(m_bt[j]);
+                        btnrp += bi_type::space_for_bt(m_bt[j]);
                     }
-                    uint16_t btnrlen = rrr_helper_type::space_for_bt(bt);
+                    uint16_t btnrlen = bi_type::space_for_bt(bt);
                     number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
-                    res =  rrr_helper_type::decode_int(bt, btnr, bb_off, len);
+                    res =  (bi_type::nr_to_bin(bt, btnr) >> bb_off) & bits::lo_set[len];
                 }
             } else { // solve multiple block case by recursion
                 uint16_t b_len = t_bs-bb_off; // remaining bits in first block
@@ -383,44 +353,20 @@ class rrr_vector
         }
 };
 
-template<uint8_t t_bit_pattern>
-struct rank_support_rrr_trait {
-    typedef bit_vector::size_type size_type;
-    static size_type adjust_rank(size_type r, SDSL_UNUSED size_type n)
-    {
-        return r;
-    }
-};
-
-template<>
-struct rank_support_rrr_trait<0> {
-    typedef bit_vector::size_type size_type;
-    static size_type adjust_rank(size_type r, size_type n)
-    {
-        return n - r;
-    }
-};
-
-//! rank_support for the rrr_vector class
-/*!
-* \tparam t_b   The bit pattern of size one. (so `0` or `1`)
-* \tparam t_bs  The block size of the corresponding rrr_vector
-* \tparam t_rac Type used to store the block type in the corresponding rrr_vector.
-*  TODO: Test if the binary search can be speed up by
-*        saving the (n/2)-th rank value in T[0], the (n/4)-th in T[1],
-*        the (3n/4)-th in T[2],... for small number of rank values
-*    is this called hinted binary search???
-*    or is this called
+//! rank_support for the specialized rrr_vector class of block size 63.
+/*! The first template parameter is the bit pattern of size one.
 */
-template<uint8_t t_b, uint16_t t_bs, class t_rac, uint16_t t_k>
-class rank_support_rrr
+template<uint8_t t_b, class t_rac, uint16_t t_k>
+class rank_support_rrr<t_b, 63, t_rac, t_k>
 {
         static_assert(t_b == 1u or t_b == 0u , "rank_support_rrr: bit pattern must be `0` or `1`");
     public:
+        static const uint16_t t_bs = 63;
         typedef rrr_vector<t_bs, t_rac, t_k> bit_vector_type;
         typedef typename bit_vector_type::size_type size_type;
         typedef typename bit_vector_type::rrr_helper_type rrr_helper_type;
         typedef typename rrr_helper_type::number_type number_type;
+        typedef binomial63 bi_type;
         enum { bit_pat = t_b };
         enum { bit_pat_len = (uint8_t)1 };
 
@@ -465,7 +411,7 @@ class rank_support_rrr
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
                 uint16_t r = m_v->m_bt[j];
                 rank  += (inv ? t_bs - r: r);
-                btnrp += rrr_helper_type::space_for_bt(r);
+                btnrp += bi_type::space_for_bt(r);
             }
             uint16_t off = i % t_bs;
             if (!off) {   // needed for special case: if i=size() is a multiple of t_bs
@@ -474,9 +420,9 @@ class rank_support_rrr
             }
             uint16_t bt = inv ? t_bs - m_v->m_bt[ bt_idx ] : m_v->m_bt[ bt_idx ];
 
-            uint16_t btnrlen = rrr_helper_type::space_for_bt(bt);
+            uint16_t btnrlen = bi_type::space_for_bt(bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, btnrlen);
-            uint16_t popcnt  = rrr_helper_type::decode_popcount(bt, btnr, off);
+            uint16_t popcnt  = __builtin_popcountll(bi_type::nr_to_bin(bt, btnr) << (64-off));
             return rank_support_rrr_trait<t_b>::adjust_rank(rank + popcnt, i);
         }
 
@@ -524,26 +470,18 @@ class rank_support_rrr
 };
 
 
-//! Select support for the rrr_vector class.
-/*
-* \tparam t_b   The bit pattern of size one. (so `0` or `1`)
-* \tparam t_bs  The block size of the corresponding rrr_vector
-* \tparam t_rac Type used to store the block type in the corresponding rrr_vector.
-*
-* Possible TODO: Add heap which contains the 10 first items of
-* each binary search could increase performance.
-* Experiments on select_support_interleaved showed about
-* 25%.
-*/
-template<uint8_t t_b, uint16_t t_bs, class t_rac, uint16_t t_k>
-class select_support_rrr
+//! Select support for the specialized rrr_vector class of block size 63.
+template<uint8_t t_b, class t_rac, uint16_t t_k>
+class select_support_rrr<t_b, 63, t_rac, t_k>
 {
         static_assert(t_b == 1u or t_b == 0u , "select_support_rrr: bit pattern must be `0` or `1`");
     public:
+        static const uint16_t t_bs = 63;
         typedef rrr_vector<t_bs, t_rac, t_k> bit_vector_type;
         typedef typename bit_vector_type::size_type size_type;
         typedef typename bit_vector_type::rrr_helper_type rrr_helper_type;
         typedef typename rrr_helper_type::number_type number_type;
+        typedef binomial63 bi_type;
         enum { bit_pat = t_b };
         enum { bit_pat_len = (uint8_t)1 };
     private:
@@ -582,11 +520,11 @@ class select_support_rrr
             while (i > rank) {
                 bt = m_v->m_bt[idx++]; bt = inv ? t_bs-bt : bt;
                 rank += bt;
-                btnrp += (btnrlen=rrr_helper_type::space_for_bt(bt));
+                btnrp += (btnrlen=bi_type::space_for_bt(bt));
             }
             rank -= bt;
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            return (idx-1) * t_bs + rrr_helper_type::decode_select(bt, btnr, i-rank);
+            return (idx-1) * t_bs + bits::sel(bi_type::nr_to_bin(bt, btnr), i-rank);
         }
 
         size_type select0(size_type i)const
@@ -620,11 +558,11 @@ class select_support_rrr
             while (i > rank) {
                 bt = m_v->m_bt[idx++]; bt = inv ? t_bs-bt : bt;
                 rank += (t_bs-bt);
-                btnrp += (btnrlen=rrr_helper_type::space_for_bt(bt));
+                btnrp += (btnrlen=bi_type::space_for_bt(bt));
             }
             rank -= (t_bs-bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            return (idx-1) * t_bs + rrr_helper_type::template decode_select_bitpattern<0, 1>(bt, btnr, i-rank);
+            return (idx-1) * t_bs + bits::sel(~((uint64_t)bi_type::nr_to_bin(bt, btnr)), i-rank);
         }
 
 
@@ -680,8 +618,5 @@ class select_support_rrr
 };
 
 }// end namespace sdsl
-#include "rrr_vector_15.hpp" // include specialization
-#include "rrr_vector_31.hpp" // include specialization
-#include "rrr_vector_63.hpp" // include specialization
 
 #endif
