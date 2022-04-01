@@ -15,16 +15,17 @@
     along with this program.  If not, see http://www.gnu.org/licenses/ .
 */
 /*! \file rrr_vector.hpp
-   \brief rrr_vector.hpp contains the sdsl::rrr_vector class, and
-          classes which support rank and select for rrr_vector.
-   \author Simon Gog, Matthias Petri
+   \brief rrr_vector.hpp contains a specialisation of the sdsl::rrr_vector class,
+          with block size k=31
+   \author Andrej Korman, Jakub Kovac
 */
-#ifndef INCLUDED_SDSL_RRR_VECTOR
-#define INCLUDED_SDSL_RRR_VECTOR
+#ifndef INCLUDED_SDSL_RRR_VECTOR_31
+#define INCLUDED_SDSL_RRR_VECTOR_31
 
 #include "int_vector.hpp"
 #include "util.hpp"
 #include "rrr_helper.hpp" // for binomial helper class
+#include "rrr_vector.hpp"
 #include "iterators.hpp"
 #include <vector>
 #include <algorithm> // for next_permutation
@@ -34,47 +35,14 @@
 namespace sdsl
 {
 
-// forward declaration needed for friend declaration
-template<uint8_t t_b=1, uint16_t t_bs=15, class t_rac=int_vector<>, uint16_t t_k=32>
-class rank_support_rrr;                // in rrr_vector
-
-// forward declaration needed for friend declaration
-template<uint8_t t_b=1, uint16_t t_bs=15, class t_rac=int_vector<>, uint16_t t_k=32>
-class select_support_rrr;                // in rrr_vector
-
-//! A \f$H_0f$-compressed bitvector representation.
-/*!
- *   \tparam t_bs   Size of a basic block.
- *   \tparam t_rac  Random access integer vector. Use to store the block types.
- *                  It is possible to use WTs for t_rac.
- *   \tparam t_k    A rank sample value is stored before every t_k-th basic block.
- *
- *   References:
- *    - Rasmus Pagh
- *      Low redundancy in dictionaries with O(1) worst case lookup time
- *      Technical Report 1998.
- *      ftp://ftp.cs.au.dk/BRICS/Reports/RS/98/28/BRICS-RS-98-28.pdf, Section 2.
- *    - Rajeev Raman, V. Raman and S. Srinivasa Rao
- *      Succinct Indexable Dictionaries with Applications to representations
- *      of k-ary trees and multi-sets.
- *      SODA 2002.
- *    - Francisco Claude, Gonzalo Navarro:
- *      Practical Rank/Select Queries over Arbitrary Sequences.
- *      SPIRE 2008: 176-187
- *    - On the fly-decoding and encoding was discovered in;
- *      Gonzalo Navarro, Eliana Providel:
- *      Fast, Small, Simple Rank/Select on Bitmaps.
- *      SEA 2012
- *
- *    In this version the block size can be adjust by the template parameter t_bs!
- *    \sa sdsl::rrr_vector for a specialized version for block_size=15
- */
-template<uint16_t t_bs=63, class t_rac=int_vector<>, uint16_t t_k=32>
-class rrr_vector
+//! A specialization of the rrr_vector class for a block_size of 31.
+template<class t_rac, uint16_t t_k>
+class rrr_vector<31, t_rac, t_k>
 {
-        static_assert(t_bs >= 3 and t_bs <= 256 , "rrr_vector: block size t_bs must be 3 <= t_bs <= 256.");
         static_assert(t_k > 1, "rrr_vector: t_k must be > 0.");
     public:
+        static const uint16_t t_bs = 31;
+
         typedef bit_vector::size_type                    size_type;
         typedef bit_vector::value_type                   value_type;
         typedef bit_vector::difference_type              difference_type;
@@ -383,40 +351,15 @@ class rrr_vector
         }
 };
 
-template<uint8_t t_bit_pattern>
-struct rank_support_rrr_trait {
-    typedef bit_vector::size_type size_type;
-    static size_type adjust_rank(size_type r, SDSL_UNUSED size_type n)
-    {
-        return r;
-    }
-};
-
-template<>
-struct rank_support_rrr_trait<0> {
-    typedef bit_vector::size_type size_type;
-    static size_type adjust_rank(size_type r, size_type n)
-    {
-        return n - r;
-    }
-};
-
-//! rank_support for the rrr_vector class
-/*!
-* \tparam t_b   The bit pattern of size one. (so `0` or `1`)
-* \tparam t_bs  The block size of the corresponding rrr_vector
-* \tparam t_rac Type used to store the block type in the corresponding rrr_vector.
-*  TODO: Test if the binary search can be speed up by
-*        saving the (n/2)-th rank value in T[0], the (n/4)-th in T[1],
-*        the (3n/4)-th in T[2],... for small number of rank values
-*    is this called hinted binary search???
-*    or is this called
+//! rank_support for the specialized rrr_vector class of block size 31.
+/*! The first template parameter is the bit pattern of size one.
 */
-template<uint8_t t_b, uint16_t t_bs, class t_rac, uint16_t t_k>
-class rank_support_rrr
+template<uint8_t t_b, class t_rac, uint16_t t_k>
+class rank_support_rrr<t_b, 31, t_rac, t_k>
 {
         static_assert(t_b == 1u or t_b == 0u , "rank_support_rrr: bit pattern must be `0` or `1`");
     public:
+        static const uint16_t t_bs = 31;
         typedef rrr_vector<t_bs, t_rac, t_k> bit_vector_type;
         typedef typename bit_vector_type::size_type size_type;
         typedef typename bit_vector_type::rrr_helper_type rrr_helper_type;
@@ -524,22 +467,13 @@ class rank_support_rrr
 };
 
 
-//! Select support for the rrr_vector class.
-/*
-* \tparam t_b   The bit pattern of size one. (so `0` or `1`)
-* \tparam t_bs  The block size of the corresponding rrr_vector
-* \tparam t_rac Type used to store the block type in the corresponding rrr_vector.
-*
-* Possible TODO: Add heap which contains the 10 first items of
-* each binary search could increase performance.
-* Experiments on select_support_interleaved showed about
-* 25%.
-*/
-template<uint8_t t_b, uint16_t t_bs, class t_rac, uint16_t t_k>
-class select_support_rrr
+//! Select support for the specialized rrr_vector class of block size 31.
+template<uint8_t t_b, class t_rac, uint16_t t_k>
+class select_support_rrr<t_b, 31, t_rac, t_k>
 {
         static_assert(t_b == 1u or t_b == 0u , "select_support_rrr: bit pattern must be `0` or `1`");
     public:
+        static const uint16_t t_bs = 31;
         typedef rrr_vector<t_bs, t_rac, t_k> bit_vector_type;
         typedef typename bit_vector_type::size_type size_type;
         typedef typename bit_vector_type::rrr_helper_type rrr_helper_type;
@@ -680,7 +614,5 @@ class select_support_rrr
 };
 
 }// end namespace sdsl
-#include "rrr_vector_15.hpp" // include specialization
-#include "rrr_vector_31.hpp" // include specialization
 
 #endif
