@@ -174,15 +174,10 @@ class rrr_vector<127, t_rac, t_k>
                 uint16_t space_for_bt = bi_type::space_for_bt(x=bt_array[i++]);
                 sum_rank += (invert ? (t_bs - x) : x);
                 if (space_for_bt) {
-                    number_type helper_bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
-                    __uint128_t bin = (static_cast<__uint128_t>(static_cast<uint64_t>(helper_bin >> 64))
-                    << 64) + static_cast<__uint128_t>(static_cast<uint64_t>(helper_bin));
-                    __uint128_t my_nr = bi_type::bin_to_nr(bin);
-                    uint64_t nr_a = static_cast<uint64_t>(my_nr);
-                    uint64_t nr_b = static_cast<uint64_t>(my_nr >> 64);
-                    number_type nr = nr_b;
-                    nr = nr << 64;
-                    nr += nr_a;
+                    number_type bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
+                    __uint128_t helper_bin = bi_type::sdsl_to_gcc(bin);
+                    __uint128_t helper_nr = bi_type::bin_to_nr(helper_bin);
+                    number_type nr = bi_type::gcc_to_sdsl(helper_nr);
                     rrr_helper_type::set_bt(m_btnr, btnr_pos, nr, space_for_bt);
                 }
                 btnr_pos += space_for_bt;
@@ -200,15 +195,10 @@ class rrr_vector<127, t_rac, t_k>
                 assert(i == bt_array.size());
                 sum_rank += invert ? (t_bs - x) : x;
                 if (space_for_bt) {
-                    number_type helper_bin = rrr_helper_type::decode_btnr(bv, pos, m_size-pos);
-                    __uint128_t bin = (static_cast<__uint128_t>(static_cast<uint64_t>(helper_bin >> 64))
-                        << 64) + static_cast<__uint128_t>(static_cast<uint64_t>(helper_bin));
-                    __uint128_t my_nr = bi_type::bin_to_nr(bin);
-                    uint64_t nr_a = static_cast<uint64_t>(my_nr);
-                    uint64_t nr_b = static_cast<uint64_t>(my_nr >> 64);
-                    number_type nr = nr_b;
-                    nr = nr << 64;
-                    nr += nr_a;
+                    number_type bin = rrr_helper_type::decode_btnr(bv, pos, m_size-pos);
+                    __uint128_t helper_bin = bi_type::sdsl_to_gcc(bin);
+                    __uint128_t helper_nr = bi_type::bin_to_nr(helper_bin);
+                    number_type nr = bi_type::gcc_to_sdsl(helper_nr);
                     rrr_helper_type::set_bt(m_btnr, btnr_pos, nr, space_for_bt);
                 }
                 btnr_pos += space_for_bt;
@@ -256,10 +246,9 @@ class rrr_vector<127, t_rac, t_k>
                 btnrp += rrr_helper_type::space_for_bt(m_bt[j]);
             }
             uint16_t btnrlen = bi_type::space_for_bt(bt);
-            auto helper_btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
-            __uint128_t btnr = (static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr >> 64))
-                << 64) + static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr));
-            return bi_type::decode_bit(bt, btnr, off);
+            number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
+            __uint128_t helper_btnr = bi_type::sdsl_to_gcc(btnr);
+            return bi_type::decode_bit(bt, helper_btnr, off);
         }
 
         //! Get the integer value of the binary string of length len starting at position idx.
@@ -291,10 +280,9 @@ class rrr_vector<127, t_rac, t_k>
                         btnrp += bi_type::space_for_bt(m_bt[j]);
                     }
                     uint16_t btnrlen = bi_type::space_for_bt(bt);
-                    auto helper_btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
-                    __uint128_t btnr = (static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr >> 64))
-                        << 64) + static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr));
-                    res =  (bi_type::nr_to_bin(bt, btnr) >> bb_off) & bits::lo_set[len];
+                    number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
+                    __uint128_t helper_btnr = bi_type::sdsl_to_gcc(btnr);
+                    res =  (bi_type::nr_to_bin(bt, helper_btnr) >> bb_off) & bits::lo_set[len];
                 }
             } else { // solve multiple block case by recursion
                 uint16_t b_len = t_bs-bb_off; // remaining bits in first block
@@ -439,10 +427,9 @@ class rank_support_rrr<t_b, 127, t_rac, t_k>
             uint16_t bt = inv ? t_bs - m_v->m_bt[ bt_idx ] : m_v->m_bt[ bt_idx ];
 
             uint16_t btnrlen = bi_type::space_for_bt(bt);
-            number_type helper_btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, btnrlen);
-            __uint128_t btnr = (static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr >> 64)) << 64) +
-                static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr));
-            uint16_t popcnt = bi_type::popcountllll(bi_type::nr_to_bin(bt, btnr) << (128 - off));
+            number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, btnrlen);
+            __uint128_t helper_btnr = bi_type::sdsl_to_gcc(btnr);
+            uint16_t popcnt = bi_type::popcountllll(bi_type::nr_to_bin(bt, helper_btnr) << (128 - off));
             return rank_support_rrr_trait<t_b>::adjust_rank(rank + popcnt, i);
         }
 
@@ -543,9 +530,8 @@ class select_support_rrr<t_b, 127, t_rac, t_k>
                 btnrp += (btnrlen=bi_type::space_for_bt(bt));
             }
             rank -= bt;
-            number_type helper_btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            __uint128_t btnr = (static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr >> 64))
-                << 64) + static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr));
+            number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
+            __uint128_t helper_btnr = bi_type::sdsl_to_gcc(btnr);
             return (idx - 1) * t_bs + bi_type::sel(bi_type::nr_to_bin(bt, btnr), i - rank);
         }
 
@@ -583,9 +569,8 @@ class select_support_rrr<t_b, 127, t_rac, t_k>
                 btnrp += (btnrlen=bi_type::space_for_bt(bt));
             }
             rank -= (t_bs-bt);
-            number_type helper_btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            __uint128_t btnr = (static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr >> 64))
-                << 64) + static_cast<__uint128_t>(static_cast<uint64_t>(helper_btnr));
+            number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
+            __uint128_t helper_btnr = bi_type::sdsl_to_gcc(btnr);
             return (idx - 1) * t_bs + bi_type::sel(~((__uint128_t)bi_type::nr_to_bin(bt, btnr)), i - rank);
         }
 

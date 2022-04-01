@@ -625,6 +625,13 @@ class binomial127
             return nr;
         }
 
+        //! Decode the bit at position \f$ off \f$ of the block encoded by the pair
+        //! (k, nr).
+        static inline bool decode_bit(uint16_t k, number_type nr, uint16_t off)
+        {
+            return (nr_to_bin(k, nr) >> off) & static_cast<__uint128_t>(1);
+        }
+
         static inline std::string toString(__uint128_t num)
         {
             std::string str;
@@ -644,11 +651,20 @@ class binomial127
             return cnt_hi + cnt_lo;
         }
 
-        //! Decode the bit at position \f$ off \f$ of the block encoded by the pair
-        //! (k, nr).
-        static inline bool decode_bit(uint16_t k, number_type nr, uint16_t off)
+                static inline __uint128_t sdsl_to_gcc(sdsl::uint128_t x)
         {
-            return (nr_to_bin(k, nr) >> off) & static_cast<__uint128_t>(1);
+            return (static_cast<__uint128_t>(static_cast<uint64_t>(x >> 64))
+                    << 64) + static_cast<uint64_t>(x);
+        }
+
+        static inline sdsl::uint128_t gcc_to_sdsl(__uint128_t x)
+        {
+            uint64_t nr_a = static_cast<uint64_t>(x);
+            uint64_t nr_b = static_cast<uint64_t>(x >> 64);
+            sdsl::uint128_t nr = nr_b;
+            nr = nr << 64;
+            nr += nr_a;
+            return nr;
         }
 };
 
