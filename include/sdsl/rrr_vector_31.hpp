@@ -26,6 +26,7 @@
 #include "util.hpp"
 #include "rrr_helper.hpp" // for binomial helper class
 #include "rrr_vector.hpp"
+#include "rrr_vector_spec_helpers.hpp"
 #include "iterators.hpp"
 #include <vector>
 #include <algorithm> // for next_permutation
@@ -65,6 +66,7 @@ class rrr_vector<31, t_rac, t_k>
         typedef typename rrr_helper_type::number_type number_type;
 
         enum { block_size = t_bs };
+        typedef binomial31 bi_type;
     private:
         size_type    m_size = 0;  // Size of the original bit_vector.
         rac_type     m_bt;     // Vector for the block types (bt). bt equals the
@@ -126,13 +128,13 @@ class rrr_vector<31, t_rac, t_k>
             while (pos + t_bs <= m_size) { // handle all blocks full blocks
                 bt_array[ i++ ] = x = rrr_helper_type::get_bt(bv, pos, t_bs);
                 sum_rank += x;
-                btnr_pos += rrr_helper_type::space_for_bt(x);
+                btnr_pos += bi_type::space_for_bt(x);
                 pos += t_bs;
             }
             if (pos < m_size) { // handle last not full block
                 bt_array[ i++ ] = x = rrr_helper_type::get_bt(bv, pos, m_size - pos);
                 sum_rank += x;
-                btnr_pos += rrr_helper_type::space_for_bt(x);
+                btnr_pos += bi_type::space_for_bt(x);
             }
             m_btnr  = bit_vector(std::max(btnr_pos, (size_type)64), 0);      // max necessary for case: t_bs == 1
             m_btnrp = int_vector<>((bt_array.size()+t_k-1)/t_k, 0,  bits::hi(btnr_pos)+1);
@@ -169,11 +171,11 @@ class rrr_vector<31, t_rac, t_k>
                         invert = false;
                     }
                 }
-                uint16_t space_for_bt = rrr_helper_type::space_for_bt(x=bt_array[i++]);
+                uint16_t space_for_bt = bi_type::space_for_bt(x=bt_array[i++]);
                 sum_rank += (invert ? (t_bs - x) : x);
                 if (space_for_bt) {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
-                    number_type nr = rrr_helper_type::bin_to_nr(bin);
+                    number_type nr = bi_type::bin_to_nr(bin);
                     rrr_helper_type::set_bt(m_btnr, btnr_pos, nr, space_for_bt);
                 }
                 btnr_pos += space_for_bt;
@@ -186,13 +188,13 @@ class rrr_vector<31, t_rac, t_k>
                     m_invert[ i/t_k ] = 0; // default: set last block to not inverted
                     invert = false;
                 }
-                uint16_t space_for_bt = rrr_helper_type::space_for_bt(x=bt_array[i++]);
+                uint16_t space_for_bt = bi_type::space_for_bt(x=bt_array[i++]);
 //          no extra dummy block added to bt_array, therefore this condition should hold
                 assert(i == bt_array.size());
                 sum_rank += invert ? (t_bs - x) : x;
                 if (space_for_bt) {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, m_size-pos);
-                    number_type nr = rrr_helper_type::bin_to_nr(bin);
+                    number_type nr = bi_type::bin_to_nr(bin);
                     rrr_helper_type::set_bt(m_btnr, btnr_pos, nr, space_for_bt);
                 }
                 btnr_pos += space_for_bt;
@@ -237,11 +239,11 @@ class rrr_vector<31, t_rac, t_k>
             uint16_t off = i % t_bs; //i - bt_idx*t_bs;
             size_type btnrp = m_btnrp[ sample_pos ];
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
-                btnrp += rrr_helper_type::space_for_bt(m_bt[j]);
+                btnrp += bi_type::space_for_bt(m_bt[j]);
             }
-            uint16_t btnrlen = rrr_helper_type::space_for_bt(bt);
+            uint16_t btnrlen = bi_type::space_for_bt(bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
-            return rrr_helper_type::decode_bit(bt, btnr, off);
+            return bi_type::decode_bit(bt, btnr, off);
         }
 
         //! Get the integer value of the binary string of length len starting at position idx.
@@ -270,11 +272,11 @@ class rrr_vector<31, t_rac, t_k>
                 } else {
                     size_type btnrp = m_btnrp[ sample_pos ];
                     for (size_type j = sample_pos*t_k; j < bb_idx; ++j) {
-                        btnrp += rrr_helper_type::space_for_bt(m_bt[j]);
+                        btnrp += bi_type::space_for_bt(m_bt[j]);
                     }
-                    uint16_t btnrlen = rrr_helper_type::space_for_bt(bt);
+                    uint16_t btnrlen = bi_type::space_for_bt(bt);
                     number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
-                    res =  rrr_helper_type::decode_int(bt, btnr, bb_off, len);
+                    res =  (bi_type::nr_to_bin(bt, btnr) >> bb_off) & bits::lo_set[len];
                 }
             } else { // solve multiple block case by recursion
                 uint16_t b_len = t_bs-bb_off; // remaining bits in first block
@@ -364,6 +366,7 @@ class rank_support_rrr<t_b, 31, t_rac, t_k>
         typedef typename bit_vector_type::size_type size_type;
         typedef typename bit_vector_type::rrr_helper_type rrr_helper_type;
         typedef typename rrr_helper_type::number_type number_type;
+        typedef binomial31 bi_type;
         enum { bit_pat = t_b };
         enum { bit_pat_len = (uint8_t)1 };
 
@@ -408,7 +411,7 @@ class rank_support_rrr<t_b, 31, t_rac, t_k>
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
                 uint16_t r = m_v->m_bt[j];
                 rank  += (inv ? t_bs - r: r);
-                btnrp += rrr_helper_type::space_for_bt(r);
+                btnrp += bi_type::space_for_bt(r);
             }
             uint16_t off = i % t_bs;
             if (!off) {   // needed for special case: if i=size() is a multiple of t_bs
@@ -417,9 +420,9 @@ class rank_support_rrr<t_b, 31, t_rac, t_k>
             }
             uint16_t bt = inv ? t_bs - m_v->m_bt[ bt_idx ] : m_v->m_bt[ bt_idx ];
 
-            uint16_t btnrlen = rrr_helper_type::space_for_bt(bt);
+            uint16_t btnrlen = bi_type::space_for_bt(bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, btnrlen);
-            uint16_t popcnt  = rrr_helper_type::decode_popcount(bt, btnr, off);
+            uint16_t popcnt  = __builtin_popcount(bi_type::nr_to_bin(bt, btnr) << (32-off));
             return rank_support_rrr_trait<t_b>::adjust_rank(rank + popcnt, i);
         }
 
@@ -478,6 +481,7 @@ class select_support_rrr<t_b, 31, t_rac, t_k>
         typedef typename bit_vector_type::size_type size_type;
         typedef typename bit_vector_type::rrr_helper_type rrr_helper_type;
         typedef typename rrr_helper_type::number_type number_type;
+        typedef binomial31 bi_type;
         enum { bit_pat = t_b };
         enum { bit_pat_len = (uint8_t)1 };
     private:
@@ -516,11 +520,11 @@ class select_support_rrr<t_b, 31, t_rac, t_k>
             while (i > rank) {
                 bt = m_v->m_bt[idx++]; bt = inv ? t_bs-bt : bt;
                 rank += bt;
-                btnrp += (btnrlen=rrr_helper_type::space_for_bt(bt));
+                btnrp += (btnrlen=bi_type::space_for_bt(bt));
             }
             rank -= bt;
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            return (idx-1) * t_bs + rrr_helper_type::decode_select(bt, btnr, i-rank);
+            return (idx-1) * t_bs + bits::sel(bi_type::nr_to_bin(bt, btnr), i-rank);
         }
 
         size_type select0(size_type i)const
@@ -554,11 +558,11 @@ class select_support_rrr<t_b, 31, t_rac, t_k>
             while (i > rank) {
                 bt = m_v->m_bt[idx++]; bt = inv ? t_bs-bt : bt;
                 rank += (t_bs-bt);
-                btnrp += (btnrlen=rrr_helper_type::space_for_bt(bt));
+                btnrp += (btnrlen=bi_type::space_for_bt(bt));
             }
             rank -= (t_bs-bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            return (idx-1) * t_bs + rrr_helper_type::template decode_select_bitpattern<0, 1>(bt, btnr, i-rank);
+            return (idx-1) * t_bs + bits::sel(~((uint64_t)bi_type::nr_to_bin(bt, btnr)), i-rank);
         }
 
 

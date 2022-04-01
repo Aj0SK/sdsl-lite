@@ -26,6 +26,7 @@
 #include "util.hpp"
 #include "rrr_helper.hpp" // for binomial helper class
 #include "rrr_vector.hpp"
+#include "rrr_vector_spec_helpers.hpp"
 #include "iterators.hpp"
 #include <vector>
 #include <algorithm> // for next_permutation
@@ -34,84 +35,6 @@
 //! Namespace for the succinct data structure library
 namespace sdsl
 {
-
-// Helper class for the binomial coefficients \f$ 15 \choose k \f$
-/*
- * Size of lookup tables:
- *  * m_nr_to_bin: 64 kB = (2^15 entries x 2 bytes)
- *  * m_bin_to_nr: 64 kB = (2^15 entries x 2 bytes)
- */
-class binomial15
-{
-    public:
-        typedef uint32_t number_type;
-    private:
-
-        static class impl
-        {
-            public:
-                static const int n = 15;
-                static const int MAX_SIZE=32;
-                uint8_t m_space_for_bt[16];
-                uint8_t m_space_for_bt_pair[256];
-                uint64_t m_C[MAX_SIZE];
-                int_vector<16> m_nr_to_bin;
-                int_vector<16> m_bin_to_nr;
-
-                impl()
-                {
-                    m_nr_to_bin.resize(1<<n);
-                    m_bin_to_nr.resize(1<<n);
-                    for (int i=0, cnt=0, class_cnt=0; i<=n; ++i) {
-                        m_C[i] = cnt;
-                        class_cnt = 0;
-                        std::vector<bool> b(n,0);
-                        for (int j=0; j<i; ++j) b[n-j-1] = 1;
-                        do {
-                            uint32_t x=0;
-                            for (int k=0; k<n; ++k)
-                                x |= ((uint32_t)b[n-k-1])<<(n-1-k);
-                            m_nr_to_bin[cnt] = x;
-                            m_bin_to_nr[x] = class_cnt;
-                            ++cnt;
-                            ++class_cnt;
-                        } while (next_permutation(b.begin(), b.end()));
-                        if (class_cnt == 1)
-                            m_space_for_bt[i] = 0;
-                        else
-                            m_space_for_bt[i] = bits::hi(class_cnt)+1;
-                    }
-                    if (n == 15) {
-                        for (int x=0; x<256; ++x) {
-                            m_space_for_bt_pair[x] = m_space_for_bt[x>>4] + m_space_for_bt[x&0x0F];
-                        }
-                    }
-                }
-        } iii;
-
-    public:
-
-        static inline uint8_t space_for_bt(uint32_t i)
-        {
-            return iii.m_space_for_bt[i];
-        }
-
-        static inline uint32_t nr_to_bin(uint8_t k, uint32_t nr)
-        {
-            return iii.m_nr_to_bin[iii.m_C[k]+nr];
-        }
-
-        static inline uint32_t bin_to_nr(uint32_t bin)
-        {
-            return iii.m_bin_to_nr[bin];
-        }
-
-        static inline uint8_t space_for_bt_pair(uint8_t x)
-        {
-            return iii.m_space_for_bt_pair[x];
-        }
-};
-
 
 //! A specialization of the rrr_vector class for a block_size of 15.
 /*!
