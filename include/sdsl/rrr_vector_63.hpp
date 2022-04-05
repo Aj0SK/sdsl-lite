@@ -37,12 +37,13 @@ namespace sdsl
 {
 
 //! A specialization of the rrr_vector class for a block_size of 63.
-template<class t_rac, uint16_t t_k>
-class rrr_vector<63, t_rac, t_k>
+template<class t_rac, uint16_t t_k, uint16_t t_hybrid>
+class rrr_vector<63, t_rac, t_k, t_hybrid>
 {
         static_assert(t_k > 1, "rrr_vector: t_k must be > 0.");
     public:
         static const uint16_t t_bs = 63;
+        static const bool is_hybrid = t_hybrid != 63;
 
         typedef bit_vector::size_type                    size_type;
         typedef bit_vector::value_type                   value_type;
@@ -52,21 +53,21 @@ class rrr_vector<63, t_rac, t_k>
         typedef iterator                                 const_iterator;
         typedef bv_tag                                   index_category;
 
-        typedef rank_support_rrr<1, t_bs, t_rac, t_k>   rank_1_type;
-        typedef rank_support_rrr<0, t_bs, t_rac, t_k>   rank_0_type;
-        typedef select_support_rrr<1, t_bs, t_rac, t_k> select_1_type;
-        typedef select_support_rrr<0, t_bs, t_rac, t_k> select_0_type;
+        typedef rank_support_rrr<1, t_bs, t_rac, t_k, t_hybrid>   rank_1_type;
+        typedef rank_support_rrr<0, t_bs, t_rac, t_k, t_hybrid>   rank_0_type;
+        typedef select_support_rrr<1, t_bs, t_rac, t_k, t_hybrid> select_1_type;
+        typedef select_support_rrr<0, t_bs, t_rac, t_k, t_hybrid> select_0_type;
 
-        friend class rank_support_rrr<0, t_bs, t_rac, t_k>;
-        friend class rank_support_rrr<1, t_bs, t_rac, t_k>;
-        friend class select_support_rrr<0, t_bs, t_rac, t_k>;
-        friend class select_support_rrr<1, t_bs, t_rac, t_k>;
+        friend class rank_support_rrr<0, t_bs, t_rac, t_k, t_hybrid>;
+        friend class rank_support_rrr<1, t_bs, t_rac, t_k, t_hybrid>;
+        friend class select_support_rrr<0, t_bs, t_rac, t_k, t_hybrid>;
+        friend class select_support_rrr<1, t_bs, t_rac, t_k, t_hybrid>;
 
         typedef rrr_helper<t_bs> rrr_helper_type;
         typedef typename rrr_helper_type::number_type number_type;
 
         enum { block_size = t_bs };
-        typedef binomial63 bi_type;
+        binomial63<is_hybrid, t_hybrid> bi_type;
     private:
         size_type    m_size = 0;  // Size of the original bit_vector.
         rac_type     m_bt;     // Vector for the block types (bt). bt equals the
@@ -128,13 +129,13 @@ class rrr_vector<63, t_rac, t_k>
             while (pos + t_bs <= m_size) { // handle all blocks full blocks
                 bt_array[ i++ ] = x = rrr_helper_type::get_bt(bv, pos, t_bs);
                 sum_rank += x;
-                btnr_pos += bi_type::space_for_bt(x);
+                btnr_pos += bi_type.space_for_bt(x);
                 pos += t_bs;
             }
             if (pos < m_size) { // handle last not full block
                 bt_array[ i++ ] = x = rrr_helper_type::get_bt(bv, pos, m_size - pos);
                 sum_rank += x;
-                btnr_pos += bi_type::space_for_bt(x);
+                btnr_pos += bi_type.space_for_bt(x);
             }
             m_btnr  = bit_vector(std::max(btnr_pos, (size_type)64), 0);      // max necessary for case: t_bs == 1
             m_btnrp = int_vector<>((bt_array.size()+t_k-1)/t_k, 0,  bits::hi(btnr_pos)+1);
@@ -152,7 +153,7 @@ class rrr_vector<63, t_rac, t_k>
                     m_btnrp[ i/t_k ] = btnr_pos;
                     m_rank[ i/t_k ] = sum_rank;
                     // calculate invert bit for that superblock
-                    if (i+t_k <= bt_array.size()) {
+                    /*if (i+t_k <= bt_array.size()) {
                         size_type gt_half_t_bs = 0; // counter for blocks greater than half of the blocksize
                         for (size_type j=i; j < i+t_k; ++j) {
                             if (bt_array[j] > t_bs/2)
@@ -167,15 +168,15 @@ class rrr_vector<63, t_rac, t_k>
                         } else {
                             invert = false;
                         }
-                    } else {
+                    } else {*/
                         invert = false;
-                    }
+                    //}
                 }
-                uint16_t space_for_bt = bi_type::space_for_bt(x=bt_array[i++]);
+                uint16_t space_for_bt = bi_type.space_for_bt(x=bt_array[i++]);
                 sum_rank += (invert ? (t_bs - x) : x);
                 if (space_for_bt) {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
-                    number_type nr = bi_type::bin_to_nr(bin);
+                    number_type nr = bi_type.bin_to_nr(bin);
                     rrr_helper_type::set_bt(m_btnr, btnr_pos, nr, space_for_bt);
                 }
                 btnr_pos += space_for_bt;
@@ -188,13 +189,13 @@ class rrr_vector<63, t_rac, t_k>
                     m_invert[ i/t_k ] = 0; // default: set last block to not inverted
                     invert = false;
                 }
-                uint16_t space_for_bt = bi_type::space_for_bt(x=bt_array[i++]);
+                uint16_t space_for_bt = bi_type.space_for_bt(x=bt_array[i++]);
 //          no extra dummy block added to bt_array, therefore this condition should hold
                 assert(i == bt_array.size());
                 sum_rank += invert ? (t_bs - x) : x;
                 if (space_for_bt) {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, m_size-pos);
-                    number_type nr = bi_type::bin_to_nr(bin);
+                    number_type nr = bi_type.bin_to_nr(bin);
                     rrr_helper_type::set_bt(m_btnr, btnr_pos, nr, space_for_bt);
                 }
                 btnr_pos += space_for_bt;
@@ -239,11 +240,11 @@ class rrr_vector<63, t_rac, t_k>
             uint16_t off = i % t_bs; //i - bt_idx*t_bs;
             size_type btnrp = m_btnrp[ sample_pos ];
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
-                btnrp += bi_type::space_for_bt(m_bt[j]);
+                btnrp += bi_type.space_for_bt(m_bt[j]);
             }
-            uint16_t btnrlen = bi_type::space_for_bt(bt);
+            uint16_t btnrlen = bi_type.space_for_bt(bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
-            return bi_type::decode_bit(bt, btnr, off);
+            return bi_type.decode_bit(bt, btnr, off);
         }
 
         //! Get the integer value of the binary string of length len starting at position idx.
@@ -272,11 +273,11 @@ class rrr_vector<63, t_rac, t_k>
                 } else {
                     size_type btnrp = m_btnrp[ sample_pos ];
                     for (size_type j = sample_pos*t_k; j < bb_idx; ++j) {
-                        btnrp += bi_type::space_for_bt(m_bt[j]);
+                        btnrp += bi_type.space_for_bt(m_bt[j]);
                     }
-                    uint16_t btnrlen = bi_type::space_for_bt(bt);
+                    uint16_t btnrlen = bi_type.space_for_bt(bt);
                     number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
-                    res =  (bi_type::nr_to_bin(bt, btnr) >> bb_off) & bits::lo_set[len];
+                    res =  (bi_type.nr_to_bin(bt, btnr) >> bb_off) & bits::lo_set[len];
                 }
             } else { // solve multiple block case by recursion
                 uint16_t b_len = t_bs-bb_off; // remaining bits in first block
@@ -356,17 +357,18 @@ class rrr_vector<63, t_rac, t_k>
 //! rank_support for the specialized rrr_vector class of block size 63.
 /*! The first template parameter is the bit pattern of size one.
 */
-template<uint8_t t_b, class t_rac, uint16_t t_k>
-class rank_support_rrr<t_b, 63, t_rac, t_k>
+template<uint8_t t_b, class t_rac, uint16_t t_k, uint16_t t_hybrid>
+class rank_support_rrr<t_b, 63, t_rac, t_k, t_hybrid>
 {
         static_assert(t_b == 1u or t_b == 0u , "rank_support_rrr: bit pattern must be `0` or `1`");
     public:
         static const uint16_t t_bs = 63;
-        typedef rrr_vector<t_bs, t_rac, t_k> bit_vector_type;
+        static const bool is_hybrid = t_hybrid != 63;
+        typedef rrr_vector<t_bs, t_rac, t_k, t_hybrid> bit_vector_type;
         typedef typename bit_vector_type::size_type size_type;
         typedef typename bit_vector_type::rrr_helper_type rrr_helper_type;
         typedef typename rrr_helper_type::number_type number_type;
-        typedef binomial63 bi_type;
+        binomial63<is_hybrid, t_hybrid> bi_type;
         enum { bit_pat = t_b };
         enum { bit_pat_len = (uint8_t)1 };
 
@@ -411,7 +413,7 @@ class rank_support_rrr<t_b, 63, t_rac, t_k>
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
                 uint16_t r = m_v->m_bt[j];
                 rank  += (inv ? t_bs - r: r);
-                btnrp += bi_type::space_for_bt(r);
+                btnrp += bi_type.space_for_bt(r);
             }
             uint16_t off = i % t_bs;
             if (!off) {   // needed for special case: if i=size() is a multiple of t_bs
@@ -420,9 +422,9 @@ class rank_support_rrr<t_b, 63, t_rac, t_k>
             }
             uint16_t bt = inv ? t_bs - m_v->m_bt[ bt_idx ] : m_v->m_bt[ bt_idx ];
 
-            uint16_t btnrlen = bi_type::space_for_bt(bt);
+            uint16_t btnrlen = bi_type.space_for_bt(bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, btnrlen);
-            uint16_t popcnt  = __builtin_popcountll(bi_type::nr_to_bin(bt, btnr) << (64-off));
+            uint16_t popcnt  = __builtin_popcountll(bi_type.nr_to_bin(bt, btnr) << (64-off));
             return rank_support_rrr_trait<t_b>::adjust_rank(rank + popcnt, i);
         }
 
@@ -471,17 +473,18 @@ class rank_support_rrr<t_b, 63, t_rac, t_k>
 
 
 //! Select support for the specialized rrr_vector class of block size 63.
-template<uint8_t t_b, class t_rac, uint16_t t_k>
-class select_support_rrr<t_b, 63, t_rac, t_k>
+template<uint8_t t_b, class t_rac, uint16_t t_k, uint16_t t_hybrid>
+class select_support_rrr<t_b, 63, t_rac, t_k, t_hybrid>
 {
         static_assert(t_b == 1u or t_b == 0u , "select_support_rrr: bit pattern must be `0` or `1`");
     public:
         static const uint16_t t_bs = 63;
-        typedef rrr_vector<t_bs, t_rac, t_k> bit_vector_type;
+        static const bool is_hybrid = t_hybrid != 63;
+        typedef rrr_vector<t_bs, t_rac, t_k, t_hybrid> bit_vector_type;
         typedef typename bit_vector_type::size_type size_type;
         typedef typename bit_vector_type::rrr_helper_type rrr_helper_type;
         typedef typename rrr_helper_type::number_type number_type;
-        typedef binomial63 bi_type;
+        binomial63<is_hybrid, t_hybrid> bi_type;
         enum { bit_pat = t_b };
         enum { bit_pat_len = (uint8_t)1 };
     private:
@@ -520,11 +523,11 @@ class select_support_rrr<t_b, 63, t_rac, t_k>
             while (i > rank) {
                 bt = m_v->m_bt[idx++]; bt = inv ? t_bs-bt : bt;
                 rank += bt;
-                btnrp += (btnrlen=bi_type::space_for_bt(bt));
+                btnrp += (btnrlen=bi_type.space_for_bt(bt));
             }
             rank -= bt;
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            return (idx-1) * t_bs + bits::sel(bi_type::nr_to_bin(bt, btnr), i-rank);
+            return (idx-1) * t_bs + bits::sel(bi_type.nr_to_bin(bt, btnr), i-rank);
         }
 
         size_type select0(size_type i)const
@@ -558,11 +561,11 @@ class select_support_rrr<t_b, 63, t_rac, t_k>
             while (i > rank) {
                 bt = m_v->m_bt[idx++]; bt = inv ? t_bs-bt : bt;
                 rank += (t_bs-bt);
-                btnrp += (btnrlen=bi_type::space_for_bt(bt));
+                btnrp += (btnrlen=bi_type.space_for_bt(bt));
             }
             rank -= (t_bs-bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            return (idx-1) * t_bs + bits::sel(~((uint64_t)bi_type::nr_to_bin(bt, btnr)), i-rank);
+            return (idx-1) * t_bs + bits::sel(~((uint64_t)bi_type.nr_to_bin(bt, btnr)), i-rank);
         }
 
 

@@ -291,65 +291,61 @@ class binomial31
         }
 };
 
+template<bool is_hybrid, uint16_t cutoff=31>
 class binomial63
 {
     public:
         typedef uint64_t number_type;
     private:
-        static class impl
+        std::array<uint64_t, 64> m_bin_30 = {0};
+        std::array<uint64_t, 64> m_bin_60 = {0};
+        std::array<uint64_t, 64> m_bin_61 = {0};
+        std::array<uint64_t, 64> m_bin_62 = {0};
+        std::array<std::array<uint64_t, 31>, 64> helper;
+        uint32_t m_space_for_bt[64];
+        binomial31<false> helper31;
+    public:
+        binomial63()
         {
-            public:
-                std::array<uint64_t, 64> m_bin_30 = {0};
-                std::array<uint64_t, 64> m_bin_60 = {0};
-                std::array<uint64_t, 64> m_bin_61 = {0};
-                std::array<uint64_t, 64> m_bin_62 = {0};
+            binomial_table<63, uint64_t> m_bin_table;
+            for (uint64_t i = 0; i <= 30; ++i)
+                m_bin_30[i] = m_bin_table.data.table[30][i];
 
-                std::array<std::array<uint64_t, 31>, 64> helper;
+            for (uint64_t i = 0; i <= 60; ++i)
+                m_bin_60[i] = m_bin_table.data.table[60][i];
 
-                uint32_t m_space_for_bt[64];
+            for (uint64_t i = 0; i <= 61; ++i)
+                m_bin_61[i] = m_bin_table.data.table[61][i];
 
-                binomial31<false> helper31;
+            for (uint64_t i = 0; i <= 62; ++i)
+                m_bin_62[i] = m_bin_table.data.table[62][i];
 
-                impl()
+            for (uint64_t i = 0; i < 64; ++i)
+            {
+                uint64_t class_cnt = m_bin_table.data.table[63][i];
+                if (class_cnt == 1)
+                    m_space_for_bt[i] = 0;
+                else if (is_hybrid && i >= cutoff)
+                    m_space_for_bt[i] = 63;
+                else
+                    m_space_for_bt[i] = bits::hi(class_cnt) + 1;
+            }
+
+            for (size_t k = 0; k < 64; ++k)
+            {
+                std::fill(helper[k].begin(), helper[k].end(), 0);
+                uint64_t total = 0;
+                for (size_t ones_in_big = (k > 30) ? (k - 30) : 0;
+                    ones_in_big <= std::min(k, static_cast<size_t>(30)); ++ones_in_big)
                 {
-                    binomial_table<63, uint64_t> m_bin_table;
-                    for (uint64_t i = 0; i <= 30; ++i)
-                        m_bin_30[i] = m_bin_table.data.table[30][i];
-
-                    for (uint64_t i = 0; i <= 60; ++i)
-                        m_bin_60[i] = m_bin_table.data.table[60][i];
-
-                    for (uint64_t i = 0; i <= 61; ++i)
-                        m_bin_61[i] = m_bin_table.data.table[61][i];
-
-                    for (uint64_t i = 0; i <= 62; ++i)
-                        m_bin_62[i] = m_bin_table.data.table[62][i];
-
-                    for (uint64_t i = 0; i < 64; ++i)
-                    {
-                        uint64_t class_cnt = m_bin_table.data.table[63][i];
-                        if (class_cnt == 1)
-                            m_space_for_bt[i] = 0;
-                        else
-                            m_space_for_bt[i] = bits::hi(class_cnt) + 1;
-                    }
-
-                    for (size_t k = 0; k < 64; ++k)
-                    {
-                        std::fill(helper[k].begin(), helper[k].end(), 0);
-                        uint64_t total = 0;
-                        for (size_t ones_in_big = (k > 30) ? (k - 30) : 0;
-                            ones_in_big <= std::min(k, static_cast<size_t>(30)); ++ones_in_big)
-                        {
-                            helper[k][ones_in_big] = total;
-                            total += m_bin_30[ones_in_big] * m_bin_30[k - ones_in_big];
-                        }
-                    }
-                } // impl() end
-        } iii;
+                    helper[k][ones_in_big] = total;
+                    total += m_bin_30[ones_in_big] * m_bin_30[k - ones_in_big];
+                }
+            }
+        } // binomial63 constructor end
 
         public:
-            static inline uint64_t nr_to_bin(uint8_t k, uint64_t nr)
+            inline uint64_t nr_to_bin(uint8_t k, uint64_t nr) const
             {
             #ifndef NO_MY_OPT
                 if (k == 63)
@@ -365,25 +361,30 @@ class binomial63
                     return (nr >= 60) ? (1ull << nr) : (1ull << (60 - nr - 1));
                 }
             #endif
+                if (is_hybrid && k >= cutoff)
+                {
+                    return nr;
+                }
+
                 uint64_t to_or = 0;
-                const bool first_bit = (nr >= iii.m_bin_62[k]);
+                const bool first_bit = (nr >= m_bin_62[k]);
                 if (first_bit)
                 {
-                    nr -= iii.m_bin_62[k];
+                    nr -= m_bin_62[k];
                     --k;
                     to_or |= 1ull << 62;
                 }
-                const bool second_bit = (nr >= (iii.m_bin_61[k]));
+                const bool second_bit = (nr >= (m_bin_61[k]));
                 if (second_bit)
                 {
-                    nr -= iii.m_bin_61[k];
+                    nr -= m_bin_61[k];
                     --k;
                     to_or |= 1ull << 61;
                 }
-                const bool third_bit = (nr >= (iii.m_bin_60[k]));
+                const bool third_bit = (nr >= (m_bin_60[k]));
                 if (third_bit)
                 {
-                    nr -= iii.m_bin_60[k];
+                    nr -= m_bin_60[k];
                     --k;
                     to_or |= 1ull << 60;
                 }
@@ -394,7 +395,7 @@ class binomial63
                 size_t right_k = right_k_from;
                 for (; right_k < right_k_to; ++right_k)
                 {
-                    if (auto curr_index = iii.helper[k][right_k + 1]; curr_index >= nr)
+                    if (auto curr_index = helper[k][right_k + 1]; curr_index >= nr)
                     {
                         if (curr_index == nr)
                         ++right_k;
@@ -402,34 +403,41 @@ class binomial63
                     }
                 }
 
-                nr -= iii.helper[k][right_k];
+                nr -= helper[k][right_k];
 
                 const size_t left_k = k - right_k;
 
                 const uint64_t left_bin =
-                    iii.helper31.nr_to_bin_30(left_k, nr % iii.m_bin_30[left_k]);
+                    helper31.nr_to_bin_30(left_k, nr % m_bin_30[left_k]);
                 const uint64_t right_bin =
-                    iii.helper31.nr_to_bin_30(right_k, nr / iii.m_bin_30[left_k]);
+                    helper31.nr_to_bin_30(right_k, nr / m_bin_30[left_k]);
 
                 return to_or | (left_bin << 30) | right_bin;
             }
 
-            static inline uint64_t bin_to_nr(const uint64_t bin)
+            inline uint64_t bin_to_nr(const uint64_t bin) const
             {
+                const uint64_t k = __builtin_popcountll(bin);
+
+                if (is_hybrid && k >= cutoff)
+                {
+                    return bin;
+                }
+
             #ifndef NO_MY_OPT
                 if ((bin == 0) || (bin == ((1ull << 63) - 1)))
                 {
                     return 0;
                 }
             #endif
-                const uint64_t k = __builtin_popcountll(bin);
+
                 bool first_bit = bin & (1ull << 62);
                 bool second_bit = bin & (1ull << 61);
                 bool third_bit = bin & (1ull << 60);
 
-                uint64_t nr = first_bit * iii.m_bin_62[k] +
-                                second_bit * iii.m_bin_61[k - first_bit] +
-                                third_bit * iii.m_bin_60[k - first_bit - second_bit];
+                uint64_t nr = first_bit * m_bin_62[k] +
+                                second_bit * m_bin_61[k - first_bit] +
+                                third_bit * m_bin_60[k - first_bit - second_bit];
 
                 const uint64_t rem_k = k - first_bit - second_bit - third_bit;
 
@@ -439,21 +447,21 @@ class binomial63
                 const uint32_t left_k = __builtin_popcount(left_bin);
                 const uint32_t right_k = __builtin_popcount(right_bin);
 
-                nr += iii.helper[rem_k][right_k];
-                nr += iii.m_bin_30[left_k] * iii.helper31.bin_to_nr_30(right_bin);
-                nr += iii.helper31.bin_to_nr_30(left_bin);
+                nr += helper[rem_k][right_k];
+                nr += m_bin_30[left_k] * helper31.bin_to_nr_30(right_bin);
+                nr += helper31.bin_to_nr_30(left_bin);
 
                 return nr;
             }
 
-            static inline uint32_t space_for_bt(uint32_t i)
+            inline uint32_t space_for_bt(uint32_t i) const
             {
-                return iii.m_space_for_bt[i];
+                return m_space_for_bt[i];
             }
 
             //! Decode the bit at position \f$ off \f$ of the block encoded by the pair
             //! (k, nr).
-            static inline bool decode_bit(uint16_t k, number_type nr, uint16_t off)
+            inline bool decode_bit(uint16_t k, number_type nr, uint16_t off) const
             {
             #ifndef NO_MY_OPT
                 if (k == 63)
@@ -486,6 +494,7 @@ class binomial127
                 std::array<__uint128_t, 128> m_bin_127 = {0};
                 std::array<std::array<__uint128_t, 64>, 128> helper;
                 uint32_t m_space_for_bt[128];
+                binomial63<false> helper63;
 
                 impl()
                 {
@@ -593,9 +602,9 @@ class binomial127
 
             const size_t left_k = k - right_k;
 
-            const __uint128_t left_bin = binomial63::nr_to_bin(
+            const __uint128_t left_bin = iii.helper63.nr_to_bin(
                 left_k, nr % iii.m_bin_63[left_k]);
-            const __uint128_t right_bin = binomial63::nr_to_bin(
+            const __uint128_t right_bin = iii.helper63.nr_to_bin(
                 right_k, nr / iii.m_bin_63[left_k]);
 
             return to_or | (left_bin << 63) | right_bin;
@@ -629,8 +638,8 @@ class binomial127
 
             nr += iii.helper[rem_k][k_right];
             nr += iii.m_bin_63[k_left] *
-                    static_cast<__uint128_t>(binomial63::bin_to_nr(bin_right));
-            nr += binomial63::bin_to_nr(bin_left);
+                    static_cast<__uint128_t>(iii.helper63.bin_to_nr(bin_right));
+            nr += iii.helper63.bin_to_nr(bin_left);
             return nr;
         }
 
