@@ -93,53 +93,49 @@ class binomial15
         }
 };
 
+template<bool is_hybrid, uint16_t cutoff=31>
 class binomial31
 {
     public:
         typedef uint32_t number_type;
     private:
-
-        static class impl
-        {
-            public:
-                std::array<uint64_t, 64> m_bin_15 = {0};
-                std::array<uint64_t, 64> m_bin_30 = {0};
-                // max number stored is roughly 16 * 41'409'225
-                std::array<std::array<uint32_t, 16>, 31> helper;
-                uint8_t m_space_for_bt[32];
-
-                impl()
-                {
-                    binomial_table<31, uint64_t> m_bin_table;
-                    for (int i = 0; i <= 15; ++i)
-                        m_bin_15[i] = m_bin_table.data.table[15][i];
-                    for (int i = 0; i <= 30; ++i)
-                        m_bin_30[i] = m_bin_table.data.table[30][i];
-                    for (int i = 0; i < 32; ++i)
-                    {
-                        size_t class_cnt = m_bin_table.data.table[31][i];
-                        if (class_cnt == 1)
-                            m_space_for_bt[i] = 0;
-                        else
-                            m_space_for_bt[i] = bits::hi(class_cnt) + 1;
-                    }
-
-                    for (size_t k = 0; k < 31; ++k)
-                    {
-                        std::fill(helper[k].begin(), helper[k].end(), 0);
-                        uint32_t total = 0;
-                        for (size_t ones_in_big = (k > 15) ? (k - 15) : 0;
-                            ones_in_big <= std::min(k, static_cast<size_t>(15)); ++ones_in_big)
-                        {
-                            helper[k][ones_in_big] = total;
-                            total += m_bin_15[ones_in_big] * m_bin_15[k - ones_in_big];
-                        }
-                    }
-                } // impl() end
-        } iii;
-
+        std::array<uint64_t, 64> m_bin_15 = {0};
+        std::array<uint64_t, 64> m_bin_30 = {0};
+        // max number stored is roughly 16 * 41'409'225
+        std::array<std::array<uint32_t, 16>, 31> helper;
+        uint8_t m_space_for_bt[32];
     public:
-        static inline uint32_t nr_to_bin_30(const uint8_t k, uint32_t nr)
+        binomial31()
+        {
+            binomial_table<31, uint64_t> m_bin_table;
+            for (int i = 0; i <= 15; ++i)
+                m_bin_15[i] = m_bin_table.data.table[15][i];
+            for (int i = 0; i <= 30; ++i)
+                m_bin_30[i] = m_bin_table.data.table[30][i];
+            for (int i = 0; i < 32; ++i)
+            {
+                size_t class_cnt = m_bin_table.data.table[31][i];
+                if (class_cnt == 1)
+                    m_space_for_bt[i] = 0;
+                else if (is_hybrid && i >= cutoff)
+                    m_space_for_bt[i] = 31;
+                else
+                    m_space_for_bt[i] = bits::hi(class_cnt) + 1;
+            }
+            for (size_t k = 0; k < 31; ++k)
+            {
+                std::fill(helper[k].begin(), helper[k].end(), 0);
+                uint32_t total = 0;
+                for (size_t ones_in_big = (k > 15) ? (k - 15) : 0;
+                    ones_in_big <= std::min(k, static_cast<size_t>(15)); ++ones_in_big)
+                {
+                    helper[k][ones_in_big] = total;
+                    total += m_bin_15[ones_in_big] * m_bin_15[k - ones_in_big];
+                }
+            }
+        } // binomial31 constructors end
+
+        inline uint32_t nr_to_bin_30(const uint8_t k, uint32_t nr) const
         {
             const int right_k_from = (k > 15) ? (k - 15) : 0;
             const int right_k_to = std::min(k, static_cast<uint8_t>(15));
@@ -147,13 +143,13 @@ class binomial31
         #ifdef __SSE4_2__
             const __m128i keys = _mm_set1_epi32(nr);
             const __m128i vec1 =
-                _mm_loadu_si128(reinterpret_cast<const __m128i*>(&iii.helper[k][0]));
+                _mm_loadu_si128(reinterpret_cast<const __m128i*>(&helper[k][0]));
             const __m128i vec2 =
-                _mm_loadu_si128(reinterpret_cast<const __m128i*>(&iii.helper[k][4]));
+                _mm_loadu_si128(reinterpret_cast<const __m128i*>(&helper[k][4]));
             const __m128i vec3 =
-                _mm_loadu_si128(reinterpret_cast<const __m128i*>(&iii.helper[k][8]));
+                _mm_loadu_si128(reinterpret_cast<const __m128i*>(&helper[k][8]));
             const __m128i vec4 =
-                _mm_loadu_si128(reinterpret_cast<const __m128i*>(&iii.helper[k][12]));
+                _mm_loadu_si128(reinterpret_cast<const __m128i*>(&helper[k][12]));
 
             const __m128i cmp1 = _mm_cmpgt_epi32(vec1, keys);
             const __m128i cmp2 = _mm_cmpgt_epi32(vec2, keys);
@@ -173,14 +169,14 @@ class binomial31
             {
                 right_k = (1 + __builtin_ctz(mask)) / 2;
 
-                if (iii.helper[k][right_k] > nr)
+                if (helper[k][right_k] > nr)
                     --right_k;
             }
         #else
             int right_k = right_k_from;
             for (; right_k < right_k_to; ++right_k)
             {
-                if (auto curr_index = iii.helper[k][right_k + 1]; curr_index >= nr)
+                if (auto curr_index = helper[k][right_k + 1]; curr_index >= nr)
                 {
                     if (curr_index == nr)
                     ++right_k;
@@ -189,20 +185,20 @@ class binomial31
             }
         #endif
 
-            nr -= iii.helper[k][right_k];
+            nr -= helper[k][right_k];
 
             int left_k = k - right_k;
 
             uint32_t left_bin =
-                binomial15::nr_to_bin(left_k, nr % iii.m_bin_15[left_k]);
+                binomial15::nr_to_bin(left_k, nr % m_bin_15[left_k]);
 
             uint32_t right_bin =
-                binomial15::nr_to_bin(right_k, nr / iii.m_bin_15[left_k]);
+                binomial15::nr_to_bin(right_k, nr / m_bin_15[left_k]);
 
             return (left_bin << 15) | right_bin;
         }
 
-        static inline uint32_t bin_to_nr_30(const uint32_t bin)
+        inline uint32_t bin_to_nr_30(const uint32_t bin) const
         {
             int k = __builtin_popcount(bin);
             uint32_t nr = 0;
@@ -211,14 +207,14 @@ class binomial31
             int left_k = __builtin_popcount(left_bin);
             int right_k = __builtin_popcount(right_bin);
 
-            nr += iii.helper[k][right_k];
-            nr += iii.m_bin_15[left_k] * binomial15::bin_to_nr(right_bin);
+            nr += helper[k][right_k];
+            nr += m_bin_15[left_k] * binomial15::bin_to_nr(right_bin);
             nr += binomial15::bin_to_nr(left_bin);
 
             return nr;
         }
 
-        static inline uint32_t nr_to_bin(uint8_t k, uint32_t nr)
+        inline uint32_t nr_to_bin(uint8_t k, uint32_t nr) const
         {
         #ifndef NO_MY_OPT
             if (k == 31)
@@ -234,7 +230,13 @@ class binomial31
                 return (nr >= 30) ? (1ull << nr) : (1ull << (30 - nr - 1));
             }
         #endif
-            const uint32_t threshold = iii.m_bin_30[k];
+
+            if (is_hybrid && k >= cutoff)
+            {
+                return nr;
+            }
+
+            const uint32_t threshold = m_bin_30[k];
             uint32_t to_or = 0;
             if (nr >= threshold)
             {
@@ -247,7 +249,7 @@ class binomial31
             return bin;
         }
 
-        static inline uint32_t bin_to_nr(const uint32_t bin)
+        inline uint32_t bin_to_nr(const uint32_t bin) const
         {
             uint32_t k = __builtin_popcount(bin);
 
@@ -258,11 +260,16 @@ class binomial31
             }
         #endif
 
+            if (is_hybrid && k >= cutoff)
+            {
+                return bin;
+            }
+
             uint32_t nr;
             if (bin & (1 << 30))
             {
                 uint32_t new_bin = bin & (~(1 << 30));
-                nr = iii.m_bin_30[k] + bin_to_nr_30(new_bin);
+                nr = m_bin_30[k] + bin_to_nr_30(new_bin);
             }
             else
             {
@@ -271,14 +278,14 @@ class binomial31
             return nr;
         }
 
-        static inline uint8_t space_for_bt(uint32_t i)
+        inline uint8_t space_for_bt(uint32_t i) const
         {
-            return iii.m_space_for_bt[i];
+            return m_space_for_bt[i];
         }
 
         //! Decode the bit at position \f$ off \f$ of the block encoded by the pair
         //! (k, nr).
-        static inline bool decode_bit(uint16_t k, number_type nr, uint16_t off)
+        inline bool decode_bit(uint16_t k, number_type nr, uint16_t off) const
         {
             return (nr_to_bin(k, nr) >> off) & (uint32_t)1;
         }
@@ -300,6 +307,8 @@ class binomial63
                 std::array<std::array<uint64_t, 31>, 64> helper;
 
                 uint32_t m_space_for_bt[64];
+
+                binomial31<false> helper31;
 
                 impl()
                 {
@@ -398,9 +407,9 @@ class binomial63
                 const size_t left_k = k - right_k;
 
                 const uint64_t left_bin =
-                    binomial31::nr_to_bin_30(left_k, nr % iii.m_bin_30[left_k]);
+                    iii.helper31.nr_to_bin_30(left_k, nr % iii.m_bin_30[left_k]);
                 const uint64_t right_bin =
-                    binomial31::nr_to_bin_30(right_k, nr / iii.m_bin_30[left_k]);
+                    iii.helper31.nr_to_bin_30(right_k, nr / iii.m_bin_30[left_k]);
 
                 return to_or | (left_bin << 30) | right_bin;
             }
@@ -431,8 +440,8 @@ class binomial63
                 const uint32_t right_k = __builtin_popcount(right_bin);
 
                 nr += iii.helper[rem_k][right_k];
-                nr += iii.m_bin_30[left_k] * binomial31::bin_to_nr_30(right_bin);
-                nr += binomial31::bin_to_nr_30(left_bin);
+                nr += iii.m_bin_30[left_k] * iii.helper31.bin_to_nr_30(right_bin);
+                nr += iii.helper31.bin_to_nr_30(left_bin);
 
                 return nr;
             }

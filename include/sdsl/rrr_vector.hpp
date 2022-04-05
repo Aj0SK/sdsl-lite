@@ -35,11 +35,11 @@ namespace sdsl
 {
 
 // forward declaration needed for friend declaration
-template<uint8_t t_b=1, uint16_t t_bs=15, class t_rac=int_vector<>, uint16_t t_k=32>
+template<uint8_t t_b=1, uint16_t t_bs=15, class t_rac=int_vector<>, uint16_t t_k=32, uint16_t t_hybrid=15>
 class rank_support_rrr;                // in rrr_vector
 
 // forward declaration needed for friend declaration
-template<uint8_t t_b=1, uint16_t t_bs=15, class t_rac=int_vector<>, uint16_t t_k=32>
+template<uint8_t t_b=1, uint16_t t_bs=15, class t_rac=int_vector<>, uint16_t t_k=32, uint16_t t_hybrid=15>
 class select_support_rrr;                // in rrr_vector
 
 //! A \f$H_0f$-compressed bitvector representation.
@@ -69,7 +69,7 @@ class select_support_rrr;                // in rrr_vector
  *    In this version the block size can be adjust by the template parameter t_bs!
  *    \sa sdsl::rrr_vector for a specialized version for block_size=15
  */
-template<uint16_t t_bs=63, class t_rac=int_vector<>, uint16_t t_k=32>
+template<uint16_t t_bs=63, class t_rac=int_vector<>, uint16_t t_k=32, uint16_t t_hybrid=t_bs>
 class rrr_vector
 {
         static_assert(t_bs >= 3 and t_bs <= 256 , "rrr_vector: block size t_bs must be 3 <= t_bs <= 256.");
@@ -412,7 +412,7 @@ struct rank_support_rrr_trait<0> {
 *    is this called hinted binary search???
 *    or is this called
 */
-template<uint8_t t_b, uint16_t t_bs, class t_rac, uint16_t t_k>
+template<uint8_t t_b, uint16_t t_bs, class t_rac, uint16_t t_k, uint16_t t_hybrid>
 class rank_support_rrr
 {
         static_assert(t_b == 1u or t_b == 0u , "rank_support_rrr: bit pattern must be `0` or `1`");
@@ -535,7 +535,7 @@ class rank_support_rrr
 * Experiments on select_support_interleaved showed about
 * 25%.
 */
-template<uint8_t t_b, uint16_t t_bs, class t_rac, uint16_t t_k>
+template<uint8_t t_b, uint16_t t_bs, class t_rac, uint16_t t_k, uint16_t t_hybrid>
 class select_support_rrr
 {
         static_assert(t_b == 1u or t_b == 0u , "select_support_rrr: bit pattern must be `0` or `1`");
