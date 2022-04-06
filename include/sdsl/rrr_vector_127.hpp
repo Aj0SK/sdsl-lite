@@ -116,7 +116,7 @@ class rrr_vector<127, t_rac, t_k, t_hybrid>
         rrr_vector(const bit_vector& bv)
         {
             m_size = bv.size();
-            int_vector<> bt_array((m_size+t_bs)/((size_type)t_bs), 0, bits::hi(t_bs)+1);
+            int_vector<> bt_array((m_size+t_bs)/((size_type)t_bs), 0, bits::hi(is_hybrid ? t_hybrid : t_bs)+1);
             //int_vector<> bt_array;
             //bt_array.width(bits::hi(t_bs)+1);
             //bt_array.resize((m_size+t_bs)/((size_type)t_bs)); // blocks for the bt_array + a dummy block at the end,
@@ -127,14 +127,16 @@ class rrr_vector<127, t_rac, t_k, t_hybrid>
             size_type btnr_pos = 0;
             size_type sum_rank = 0;
             while (pos + t_bs <= m_size) { // handle all blocks full blocks
-                bt_array[ i++ ] = x = rrr_helper_type::get_bt(bv, pos, t_bs);
-                sum_rank += x;
+                auto bt = rrr_helper_type::get_bt(bv, pos, t_bs);
+                bt_array[i++] = x = is_hybrid ? std::min(t_hybrid, bt) : bt;
+                sum_rank += bt;
                 btnr_pos += bi_type.space_for_bt(x);
                 pos += t_bs;
             }
             if (pos < m_size) { // handle last not full block
-                bt_array[ i++ ] = x = rrr_helper_type::get_bt(bv, pos, m_size - pos);
-                sum_rank += x;
+                auto bt = rrr_helper_type::get_bt(bv, pos, m_size - pos);
+                bt_array[i++] = x = is_hybrid ? std::min(t_hybrid, bt) : bt;
+                sum_rank += bt;
                 btnr_pos += bi_type.space_for_bt(x);
             }
             m_btnr  = bit_vector(std::max(btnr_pos, (size_type)64), 0);      // max necessary for case: t_bs == 1
@@ -173,7 +175,15 @@ class rrr_vector<127, t_rac, t_k, t_hybrid>
                     //}
                 }
                 uint16_t space_for_bt = bi_type.space_for_bt(x=bt_array[i++]);
-                sum_rank += (invert ? (t_bs - x) : x);
+                if (is_hybrid && x >= t_hybrid)
+                {
+                    number_type bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
+                    sum_rank += bi_type.popcountllll(bin);
+                }
+                else
+                {
+                    sum_rank += (invert ? (t_bs - x) : x);
+                }
                 if (space_for_bt) {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
                     __uint128_t helper_bin = bi_type.sdsl_to_gcc(bin);
@@ -194,7 +204,15 @@ class rrr_vector<127, t_rac, t_k, t_hybrid>
                 uint16_t space_for_bt = bi_type.space_for_bt(x=bt_array[i++]);
 //          no extra dummy block added to bt_array, therefore this condition should hold
                 assert(i == bt_array.size());
-                sum_rank += invert ? (t_bs - x) : x;
+                if (is_hybrid && x >= t_hybrid)
+                {
+                    number_type bin = rrr_helper_type::decode_btnr(bv, pos, m_size - pos);
+                    sum_rank += bi_type.popcountllll(bin);
+                }
+                else
+                {
+                    sum_rank += invert ? (t_bs - x) : x;
+                }
                 if (space_for_bt) {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, m_size-pos);
                     __uint128_t helper_bin = bi_type.sdsl_to_gcc(bin);
@@ -418,7 +436,15 @@ class rank_support_rrr<t_b, 127, t_rac, t_k, t_hybrid>
             const bool inv = m_v->m_invert[ sample_pos ];
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
                 uint16_t r = m_v->m_bt[j];
-                rank  += (inv ? t_bs - r: r);
+                if (is_hybrid && r >= t_hybrid)
+                {
+                    number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, t_bs);
+                    rank += bi_type.popcountllll(btnr);
+                }
+                else
+                {
+                    rank  += (inv ? t_bs - r: r);
+                }
                 btnrp += bi_type.space_for_bt(r);
             }
             uint16_t off = i % t_bs;
@@ -528,14 +554,46 @@ class select_support_rrr<t_b, 127, t_rac, t_k, t_hybrid>
             size_type btnrp = m_v->m_btnrp[ begin ];
             uint16_t bt = 0, btnrlen = 0; // temp variables for block_type and space for block type
             while (i > rank) {
-                bt = m_v->m_bt[idx++]; bt = inv ? t_bs-bt : bt;
+                bt = m_v->m_bt[idx++];
+                if (is_hybrid && bt >= t_hybrid)
+                {
+                    uint64_t hybrid_len =
+                        std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
+                    __uint128_t bin = 0;
+                    if (hybrid_len > 64)
+                    {
+                        __uint128_t bin1 = m_v->get_int((idx - 1) * t_bs, 64);
+                        __uint128_t bin2 = m_v->get_int((idx - 1) * t_bs+64, hybrid_len - 64);
+                        bin = bin1;
+                        bin2 = bin2 << 64;
+                        bin += bin2;
+                    }
+                    else
+                    {
+                        bin = m_v->get_int((idx - 1) * t_bs, hybrid_len);
+                    }
+                    bt = bi_type.popcountllll(bi_type.nr_to_bin(bt, bin));
+                }
+                bt = inv ? t_bs-bt : bt;
                 rank += bt;
                 btnrp += (btnrlen=bi_type.space_for_bt(bt));
             }
             rank -= bt;
-            number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            __uint128_t helper_btnr = bi_type.sdsl_to_gcc(btnr);
-            return (idx - 1) * t_bs + bi_type.sel(bi_type.nr_to_bin(bt, btnr), i - rank);
+            uint64_t hybrid_len = std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
+            __uint128_t bin = 0;
+            if (hybrid_len > 64)
+            {
+                __uint128_t bin1 = m_v->get_int((idx - 1) * t_bs, 64);
+                __uint128_t bin2 = m_v->get_int((idx - 1) * t_bs+64, hybrid_len - 64);
+                bin = bin1;
+                bin2 = bin2 << 64;
+                bin += bin2;
+            }
+            else
+            {
+                bin = m_v->get_int((idx - 1) * t_bs, hybrid_len);
+            }
+            return (idx - 1) * t_bs + bi_type.sel(bin, i - rank);
         }
 
         size_type select0(size_type i)const
@@ -567,14 +625,46 @@ class select_support_rrr<t_b, 127, t_rac, t_k, t_hybrid>
             size_type btnrp = m_v->m_btnrp[ begin ];
             uint16_t bt = 0, btnrlen = 0; // temp variables for block_type and space for block type
             while (i > rank) {
-                bt = m_v->m_bt[idx++]; bt = inv ? t_bs-bt : bt;
+                bt = m_v->m_bt[idx++];
+                if (is_hybrid && bt >= t_hybrid)
+                {
+                    uint64_t hybrid_len =
+                        std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
+                    __uint128_t bin = 0;
+                    if (hybrid_len > 64)
+                    {
+                        __uint128_t bin1 = m_v->get_int((idx - 1) * t_bs, 64);
+                        __uint128_t bin2 = m_v->get_int((idx - 1) * t_bs+64, hybrid_len - 64);
+                        bin = bin1;
+                        bin2 = bin2 << 64;
+                        bin += bin2;
+                    }
+                    else
+                    {
+                        bin = m_v->get_int((idx - 1) * t_bs, hybrid_len);
+                    }
+                    bt = bi_type.popcountllll(bi_type.nr_to_bin(bt, bin));
+                }
+                bt = inv ? t_bs-bt : bt;
                 rank += (t_bs-bt);
                 btnrp += (btnrlen=bi_type.space_for_bt(bt));
             }
             rank -= (t_bs-bt);
-            number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
-            __uint128_t helper_btnr = bi_type.sdsl_to_gcc(btnr);
-            return (idx - 1) * t_bs + bi_type.sel(~((__uint128_t)bi_type.nr_to_bin(bt, btnr)), i - rank);
+            uint64_t hybrid_len = std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
+            __uint128_t bin = 0;
+            if (hybrid_len > 64)
+            {
+                __uint128_t bin1 = ~m_v->get_int((idx - 1) * t_bs, 64);
+                __uint128_t bin2 = ~m_v->get_int((idx - 1) * t_bs+64, hybrid_len - 64);
+                bin = bin1;
+                bin2 = bin2 << 64;
+                bin += bin2;
+            }
+            else
+            {
+                bin = m_v->get_int((idx - 1) * t_bs, hybrid_len);
+            }
+            return (idx - 1) * t_bs + bi_type.sel(bin, i - rank);
         }
 
 
