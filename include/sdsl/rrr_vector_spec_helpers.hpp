@@ -216,6 +216,11 @@ class binomial31
 
         inline uint32_t nr_to_bin(uint8_t k, uint32_t nr) const
         {
+            if (is_hybrid && k >= cutoff)
+            {
+                return nr;
+            }
+
         #ifndef NO_MY_OPT
             if (k == 31)
             {
@@ -230,11 +235,6 @@ class binomial31
                 return (nr >= 30) ? (1ull << nr) : (1ull << (30 - nr - 1));
             }
         #endif
-
-            if (is_hybrid && k >= cutoff)
-            {
-                return nr;
-            }
 
             const uint32_t threshold = m_bin_30[k];
             uint32_t to_or = 0;
@@ -253,18 +253,19 @@ class binomial31
         {
             uint32_t k = __builtin_popcount(bin);
 
-        #ifndef NO_MY_OPT
-            if ((bin == 0) || (bin == ((1ull << 31) - 1)))
-            {
-                return 0;
-            }
-        #endif
 
             if (is_hybrid && k >= cutoff)
             {
                 return bin;
             }
 
+
+        #ifndef NO_MY_OPT
+            if ((bin == 0) || (bin == ((1ull << 31) - 1)))
+            {
+                return 0;
+            }
+        #endif
             uint32_t nr;
             if (bin & (1 << 30))
             {
