@@ -551,7 +551,7 @@ class select_support_rrr<t_b, 63, t_rac, t_k, t_hybrid>
                 if (is_hybrid && bt >= t_hybrid)
                 {
                     uint64_t hybrid_len = std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
-                    number_type btnr = m_v->get_int((idx - 1) * t_bs, hybrid_len);
+                    number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, hybrid_len);
                     bt = __builtin_popcountll(bi_type.nr_to_bin(bt, btnr));
                 }
                 bt = inv ? t_bs-bt : bt;
@@ -597,7 +597,7 @@ class select_support_rrr<t_b, 63, t_rac, t_k, t_hybrid>
                 if (is_hybrid && bt >= t_hybrid)
                 {
                     uint64_t hybrid_len = std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
-                    number_type btnr = m_v->get_int((idx - 1) * t_bs, hybrid_len);
+                    number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, hybrid_len);
                     bt = __builtin_popcountll(bi_type.nr_to_bin(bt, btnr));
                 }
                 bt = inv ? t_bs-bt : bt;

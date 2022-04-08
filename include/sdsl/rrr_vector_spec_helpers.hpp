@@ -115,10 +115,10 @@ class binomial31
             for (int i = 0; i < 32; ++i)
             {
                 size_t class_cnt = m_bin_table.data.table[31][i];
-                if (class_cnt == 1)
-                    m_space_for_bt[i] = 0;
-                else if (is_hybrid && i >= cutoff)
+                if (is_hybrid && i >= cutoff)
                     m_space_for_bt[i] = 31;
+                else if (class_cnt == 1)
+                    m_space_for_bt[i] = 0;
                 else
                     m_space_for_bt[i] = bits::hi(class_cnt) + 1;
             }
@@ -324,10 +324,10 @@ class binomial63
             for (uint64_t i = 0; i < 64; ++i)
             {
                 uint64_t class_cnt = m_bin_table.data.table[63][i];
-                if (class_cnt == 1)
-                    m_space_for_bt[i] = 0;
-                else if (is_hybrid && i >= cutoff)
+                if (is_hybrid && i >= cutoff)
                     m_space_for_bt[i] = 63;
+                else if (class_cnt == 1)
+                    m_space_for_bt[i] = 0;
                 else
                     m_space_for_bt[i] = bits::hi(class_cnt) + 1;
             }
@@ -511,10 +511,10 @@ class binomial127
             for (uint64_t i = 0; i < 128; ++i)
             {
                 __uint128_t class_cnt = m_bin_127[i];
-                if (class_cnt == 1)
-                    m_space_for_bt[i] = 0;
-                else if (is_hybrid && i >= cutoff)
+                if (is_hybrid && i >= cutoff)
                     m_space_for_bt[i] = 127;
+                else if (class_cnt == 1)
+                    m_space_for_bt[i] = 0;
                 else
                 {
                     size_t last = 0;

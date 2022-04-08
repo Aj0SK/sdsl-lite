@@ -559,20 +559,9 @@ class select_support_rrr<t_b, 127, t_rac, t_k, t_hybrid>
                 {
                     uint64_t hybrid_len =
                         std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
-                    __uint128_t bin = 0;
-                    if (hybrid_len > 64)
-                    {
-                        __uint128_t bin1 = m_v->get_int((idx - 1) * t_bs, 64);
-                        __uint128_t bin2 = m_v->get_int((idx - 1) * t_bs+64, hybrid_len - 64);
-                        bin = bin1;
-                        bin2 = bin2 << 64;
-                        bin += bin2;
-                    }
-                    else
-                    {
-                        bin = m_v->get_int((idx - 1) * t_bs, hybrid_len);
-                    }
-                    bt = bi_type.popcountllll(bi_type.nr_to_bin(bt, bin));
+                    number_type helper_btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, hybrid_len);
+                    __uint128_t btnr = bi_type.sdsl_to_gcc(helper_btnr);
+                    bt = bi_type.popcountllll(bi_type.nr_to_bin(bt, btnr));
                 }
                 bt = inv ? t_bs-bt : bt;
                 rank += bt;
@@ -630,20 +619,9 @@ class select_support_rrr<t_b, 127, t_rac, t_k, t_hybrid>
                 {
                     uint64_t hybrid_len =
                         std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
-                    __uint128_t bin = 0;
-                    if (hybrid_len > 64)
-                    {
-                        __uint128_t bin1 = m_v->get_int((idx - 1) * t_bs, 64);
-                        __uint128_t bin2 = m_v->get_int((idx - 1) * t_bs+64, hybrid_len - 64);
-                        bin = bin1;
-                        bin2 = bin2 << 64;
-                        bin += bin2;
-                    }
-                    else
-                    {
-                        bin = m_v->get_int((idx - 1) * t_bs, hybrid_len);
-                    }
-                    bt = bi_type.popcountllll(bi_type.nr_to_bin(bt, bin));
+                    number_type helper_btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, hybrid_len);
+                    __uint128_t btnr = bi_type.sdsl_to_gcc(helper_btnr);
+                    bt = bi_type.popcountllll(bi_type.nr_to_bin(bt, btnr));
                 }
                 bt = inv ? t_bs-bt : bt;
                 rank += (t_bs-bt);
