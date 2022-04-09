@@ -98,6 +98,8 @@ class binomial31
 {
     public:
         typedef uint32_t number_type;
+        static const uint16_t cut_from = (cutoff+1)/2;
+        static const uint16_t cut_to = 31-cut_from+1;
     private:
         std::array<uint64_t, 64> m_bin_15 = {0};
         std::array<uint64_t, 64> m_bin_30 = {0};
@@ -115,7 +117,7 @@ class binomial31
             for (int i = 0; i < 32; ++i)
             {
                 size_t class_cnt = m_bin_table.data.table[31][i];
-                if (is_hybrid && i >= cutoff)
+                if (is_hybrid && i >= cut_from && i <= cut_to)
                     m_space_for_bt[i] = 31;
                 else if (class_cnt == 1)
                     m_space_for_bt[i] = 0;
@@ -134,6 +136,40 @@ class binomial31
                 }
             }
         } // binomial31 constructors end
+
+        inline uint8_t compress_bt(uint8_t k) const
+        {
+            if (!is_hybrid) return k;
+            if (k < cut_from)
+            {
+                return k;
+            }
+            else if (k <= cut_to)
+            {
+                return cutoff;
+            }
+            else
+            {
+                return k-(cut_to-cut_from+1);
+            }
+        }
+
+        inline uint8_t decompress_bt(uint8_t k) const
+        {
+            if (!is_hybrid) return k;
+            if (k < cut_from)
+            {
+                return k;
+            }
+            else if (k == cutoff)
+            {
+                return cut_to;
+            }
+            else
+            {
+                return k+(cut_to-cut_from+1);
+            }
+        }
 
         inline uint32_t nr_to_bin_30(const uint8_t k, uint32_t nr) const
         {
@@ -216,7 +252,7 @@ class binomial31
 
         inline uint32_t nr_to_bin(uint8_t k, uint32_t nr) const
         {
-            if (is_hybrid && k >= cutoff)
+            if (is_hybrid && k >= cut_from && k <= cut_to)
             {
                 return nr;
             }
@@ -253,12 +289,10 @@ class binomial31
         {
             uint32_t k = __builtin_popcount(bin);
 
-
-            if (is_hybrid && k >= cutoff)
+            if (is_hybrid && k >= cut_from && k <= cut_to)
             {
                 return bin;
             }
-
 
         #ifndef NO_MY_OPT
             if ((bin == 0) || (bin == ((1ull << 31) - 1)))
