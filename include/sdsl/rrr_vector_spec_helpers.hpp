@@ -556,6 +556,8 @@ class binomial127
 {
     public:
         typedef __uint128_t number_type;
+        static const uint16_t cut_from = (cutoff+1)/2;
+        static const uint16_t cut_to = 127-cut_from+1;
     private:
         std::array<__uint128_t, 128> m_bin_63 = {0};
         std::array<__uint128_t, 128> m_bin_126 = {0};
@@ -580,7 +582,7 @@ class binomial127
             for (uint64_t i = 0; i < 128; ++i)
             {
                 __uint128_t class_cnt = m_bin_127[i];
-                if (is_hybrid && i >= cutoff)
+                if (is_hybrid && i >= cut_from && i <= cut_to)
                     m_space_for_bt[i] = 127;
                 else if (class_cnt == 1)
                     m_space_for_bt[i] = 0;
@@ -610,6 +612,40 @@ class binomial127
                 }
             }
         } // binomial127 constructor end
+
+        inline uint8_t compress_bt(uint8_t k) const
+        {
+            if (!is_hybrid) return k;
+            if (k < cut_from)
+            {
+                return k;
+            }
+            else if (k <= cut_to)
+            {
+                return cutoff;
+            }
+            else
+            {
+                return k-(cut_to-cut_from+1);
+            }
+        }
+
+        inline uint8_t decompress_bt(uint8_t k) const
+        {
+            if (!is_hybrid) return k;
+            if (k < cut_from)
+            {
+                return k;
+            }
+            else if (k == cutoff)
+            {
+                return cut_to;
+            }
+            else
+            {
+                return k+(cut_to-cut_from+1);
+            }
+        }
 
         inline uint32_t space_for_bt(uint32_t i) const
         {
@@ -642,7 +678,7 @@ class binomial127
             }
         #endif
 
-            if (is_hybrid && k >= cutoff)
+            if (is_hybrid && k >= cut_from && k <= cut_to)
             {
                 return nr;
             }
@@ -687,7 +723,7 @@ class binomial127
         {
             const int k = popcountllll(bin);
 
-            if (is_hybrid && k >= cutoff)
+            if (is_hybrid && k >= cut_from && k <= cut_to)
             {
                 return bin;
             }
