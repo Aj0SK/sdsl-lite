@@ -128,16 +128,16 @@ class rrr_vector<63, t_rac, t_k, t_hybrid>
             size_type sum_rank = 0;
             while (pos + t_bs <= m_size) { // handle all blocks full blocks
                 auto bt = rrr_helper_type::get_bt(bv, pos, t_bs);
-                bt_array[i++] = x = is_hybrid ? std::min(t_hybrid, bt) : bt;
+                bt_array[i++] = x = bi_type.compress_bt(bt);
                 sum_rank += bt;
-                btnr_pos += bi_type.space_for_bt(x);
+                btnr_pos += bi_type.space_for_bt(bt);
                 pos += t_bs;
             }
             if (pos < m_size) { // handle last not full block
                 auto bt = rrr_helper_type::get_bt(bv, pos, m_size - pos);
-                bt_array[i++] = x = is_hybrid ? std::min(t_hybrid, bt) : bt;
+                bt_array[i++] = x = bi_type.compress_bt(bt);
                 sum_rank += bt;
-                btnr_pos += bi_type.space_for_bt(x);
+                btnr_pos += bi_type.space_for_bt(bt);
             }
             m_btnr  = bit_vector(std::max(btnr_pos, (size_type)64), 0);      // max necessary for case: t_bs == 1
             m_btnrp = int_vector<>((bt_array.size()+t_k-1)/t_k, 0,  bits::hi(btnr_pos)+1);
@@ -174,8 +174,8 @@ class rrr_vector<63, t_rac, t_k, t_hybrid>
                         invert = false;
                     //}
                 }
-                uint16_t space_for_bt = bi_type.space_for_bt(x=bt_array[i++]);
-                if (is_hybrid && x >= t_hybrid)
+                uint16_t space_for_bt = bi_type.space_for_bt(x=bi_type.decompress_bt(bt_array[i++]));
+                if (is_hybrid && x >= bi_type.cut_from && x <= bi_type.cut_to)
                 {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
                     sum_rank += __builtin_popcountll(bin);
@@ -199,10 +199,10 @@ class rrr_vector<63, t_rac, t_k, t_hybrid>
                     m_invert[ i/t_k ] = 0; // default: set last block to not inverted
                     invert = false;
                 }
-                uint16_t space_for_bt = bi_type.space_for_bt(x=bt_array[i++]);
+                uint16_t space_for_bt = bi_type.space_for_bt(x=bi_type.decompress_bt(bt_array[i++]));
 //          no extra dummy block added to bt_array, therefore this condition should hold
                 assert(i == bt_array.size());
-                if (is_hybrid && x >= t_hybrid)
+                if (is_hybrid && x >= bi_type.cut_from && x <= bi_type.cut_to)
                 {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, m_size - pos);
                     sum_rank += __builtin_popcountll(bin);
@@ -246,7 +246,7 @@ class rrr_vector<63, t_rac, t_k, t_hybrid>
         value_type operator[](size_type i)const
         {
             size_type bt_idx = i/t_bs;
-            uint16_t bt = m_bt[bt_idx];
+            uint16_t bt = bi_type.decompress_bt(m_bt[bt_idx]);
             size_type sample_pos = bt_idx/t_k;
             if (m_invert[sample_pos])
                 bt = t_bs - bt;
@@ -258,7 +258,7 @@ class rrr_vector<63, t_rac, t_k, t_hybrid>
             uint16_t off = i % t_bs; //i - bt_idx*t_bs;
             size_type btnrp = m_btnrp[ sample_pos ];
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
-                btnrp += bi_type.space_for_bt(m_bt[j]);
+                btnrp += bi_type.space_for_bt(bi_type.decompress_bt(m_bt[j]));
             }
             uint16_t btnrlen = bi_type.space_for_bt(bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
@@ -278,7 +278,7 @@ class rrr_vector<63, t_rac, t_k, t_hybrid>
             uint64_t res = 0;
             size_type bb_idx = idx/t_bs; // begin block index
             size_type bb_off = idx%t_bs; // begin block offset
-            uint16_t bt = m_bt[bb_idx];
+            uint16_t bt = bi_type.decompress_bt(m_bt[bb_idx]);
             size_type sample_pos = bb_idx/t_k;
             size_type eb_idx = (idx+len-1)/t_bs; // end block index
             if (bb_idx == eb_idx) {  // extract only in one block
@@ -291,7 +291,7 @@ class rrr_vector<63, t_rac, t_k, t_hybrid>
                 } else {
                     size_type btnrp = m_btnrp[ sample_pos ];
                     for (size_type j = sample_pos*t_k; j < bb_idx; ++j) {
-                        btnrp += bi_type.space_for_bt(m_bt[j]);
+                        btnrp += bi_type.space_for_bt(bi_type.decompress_bt(m_bt[j]));
                     }
                     uint16_t btnrlen = bi_type.space_for_bt(bt);
                     number_type btnr = rrr_helper_type::decode_btnr(m_btnr, btnrp, btnrlen);
@@ -429,8 +429,8 @@ class rank_support_rrr<t_b, 63, t_rac, t_k, t_hybrid>
             }
             const bool inv = m_v->m_invert[ sample_pos ];
             for (size_type j = sample_pos*t_k; j < bt_idx; ++j) {
-                uint16_t r = m_v->m_bt[j];
-                if (is_hybrid && r >= t_hybrid)
+                uint16_t r = bi_type.decompress_bt(m_v->m_bt[j]);
+                if (is_hybrid && r >= bi_type.cut_from && r <= bi_type.cut_to)
                 {
                     number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, t_bs);
                     rank += __builtin_popcountll(btnr);
@@ -446,7 +446,7 @@ class rank_support_rrr<t_b, 63, t_rac, t_k, t_hybrid>
                 // the access to m_bt would cause a invalid memory access
                 return rank_support_rrr_trait<t_b>::adjust_rank(rank, i);
             }
-            uint16_t bt = inv ? t_bs - m_v->m_bt[ bt_idx ] : m_v->m_bt[ bt_idx ];
+            uint16_t bt = inv ? t_bs - bi_type.decompress_bt(m_v->m_bt[ bt_idx ]) : bi_type.decompress_bt(m_v->m_bt[ bt_idx ]);
 
             uint16_t btnrlen = bi_type.space_for_bt(bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, btnrlen);
@@ -547,8 +547,8 @@ class select_support_rrr<t_b, 63, t_rac, t_k, t_hybrid>
             size_type btnrp = m_v->m_btnrp[ begin ];
             uint16_t bt = 0, btnrlen = 0; // temp variables for block_type and space for block type
             while (i > rank) {
-                bt = m_v->m_bt[idx++];
-                if (is_hybrid && bt >= t_hybrid)
+                bt = bi_type.decompress_bt(m_v->m_bt[idx++]);
+                if (is_hybrid && bt >= bi_type.cut_from && bt <= bi_type.cut_to)
                 {
                     uint64_t hybrid_len = std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
                     number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, hybrid_len);
@@ -593,8 +593,8 @@ class select_support_rrr<t_b, 63, t_rac, t_k, t_hybrid>
             size_type btnrp = m_v->m_btnrp[ begin ];
             uint16_t bt = 0, btnrlen = 0; // temp variables for block_type and space for block type
             while (i > rank) {
-                bt = m_v->m_bt[idx++];
-                if (is_hybrid && bt >= t_hybrid)
+                bt = bi_type.decompress_bt(m_v->m_bt[idx++]);
+                if (is_hybrid && bt >= bi_type.cut_from && bt <= bi_type.cut_to)
                 {
                     uint64_t hybrid_len = std::min(static_cast<uint64_t>(t_bs), (idx - 1) * t_bs - m_v->size());
                     number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, hybrid_len);

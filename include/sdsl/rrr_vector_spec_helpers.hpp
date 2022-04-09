@@ -331,6 +331,8 @@ class binomial63
 {
     public:
         typedef uint64_t number_type;
+        static const uint16_t cut_from = (cutoff+1)/2;
+        static const uint16_t cut_to = 63-cut_from+1;
     private:
         std::array<uint64_t, 64> m_bin_30 = {0};
         std::array<uint64_t, 64> m_bin_60 = {0};
@@ -358,7 +360,7 @@ class binomial63
             for (uint64_t i = 0; i < 64; ++i)
             {
                 uint64_t class_cnt = m_bin_table.data.table[63][i];
-                if (is_hybrid && i >= cutoff)
+                if (is_hybrid && i >= cut_from && i <= cut_to)
                     m_space_for_bt[i] = 63;
                 else if (class_cnt == 1)
                     m_space_for_bt[i] = 0;
@@ -379,7 +381,40 @@ class binomial63
             }
         } // binomial63 constructor end
 
-        public:
+        inline uint8_t compress_bt(uint8_t k) const
+        {
+            if (!is_hybrid) return k;
+            if (k < cut_from)
+            {
+                return k;
+            }
+            else if (k <= cut_to)
+            {
+                return cutoff;
+            }
+            else
+            {
+                return k-(cut_to-cut_from+1);
+            }
+        }
+
+        inline uint8_t decompress_bt(uint8_t k) const
+        {
+            if (!is_hybrid) return k;
+            if (k < cut_from)
+            {
+                return k;
+            }
+            else if (k == cutoff)
+            {
+                return cut_to;
+            }
+            else
+            {
+                return k+(cut_to-cut_from+1);
+            }
+        }
+
             inline uint64_t nr_to_bin(uint8_t k, uint64_t nr) const
             {
             #ifndef NO_MY_OPT
@@ -396,7 +431,7 @@ class binomial63
                     return (nr >= 60) ? (1ull << nr) : (1ull << (60 - nr - 1));
                 }
             #endif
-                if (is_hybrid && k >= cutoff)
+                if (is_hybrid && k >= cut_from && k <= cut_to)
                 {
                     return nr;
                 }
@@ -454,7 +489,7 @@ class binomial63
             {
                 const uint64_t k = __builtin_popcountll(bin);
 
-                if (is_hybrid && k >= cutoff)
+                if (is_hybrid && k >= cut_from && k <= cut_to)
                 {
                     return bin;
                 }
