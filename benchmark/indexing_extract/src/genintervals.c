@@ -28,7 +28,7 @@ int aleat(top)
     struct timeval t;
     if (fst) {
         gettimeofday(&t,NULL);
-        Seed = t.tv_sec*t.tv_usec;
+        Seed = t.tv_sec/3600;
         fst=0;
     }
     {

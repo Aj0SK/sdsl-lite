@@ -282,9 +282,9 @@ do_extract(const CSA_TYPE& csa)
 
     fprintf(stderr, "# Total_num_chars_extracted = %lu\n", tot_ext);
     fprintf(stderr, "# Extract_time_in_sec = %.2f\n", tot_time);
-    fprintf(stderr, "# Extract_time/Num_chars_extracted = %.4f\n\n",
+    fprintf(stderr, "# Extract_time/Num_chars_extracted = %.4f\n",
             (tot_time * 1000) / tot_ext);
-    fprintf(stderr, "(Load_time+Extract_time)/Num_chars_extracted = %.4f\n\n",
+    fprintf(stderr, "# (Load_time+Extract_time)/Num_chars_extracted = %.4f\n\n",
             ((Load_time+tot_time) * 1000) / tot_ext);
 }
 

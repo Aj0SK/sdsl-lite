@@ -156,7 +156,7 @@ do_count(const CSA_TYPE& csa)
     fprintf(stderr, "# Count_time_in_milli_sec = %.4f\n", tot_time*1000);
     fprintf(stderr, "# Count_time/Pattern_chars = %.4f\n",
             (tot_time * 1000) / (length * numpatt));
-    fprintf(stderr, "# Count_time/Num_patterns = %.4f\n\n",
+    fprintf(stderr, "# Count_time/Num_patterns = %.4f\n",
             (tot_time * 1000) / numpatt);
     fprintf(stderr, "# (Load_time+Count_time)/Pattern_chars = %.4f\n",
             ((Load_time+tot_time) * 1000) / (length * numpatt));
@@ -208,8 +208,8 @@ do_locate(const CSA_TYPE& csa)
 
     fprintf(stderr, "# Total_Num_occs_found = %lu\n", tot_numocc);
     fprintf(stderr, "# Locate_time_in_secs = %.2f\n", tot_time);
-    fprintf(stderr, "# Locate_time/Num_occs = %.4f\n\n", (tot_time * 1000) / tot_numocc);
-    fprintf(stderr, "# (Load_time+Locate_time)/Num_occs = %.4f\n\n", ((tot_time+Load_time) * 1000) / tot_numocc);
+    fprintf(stderr, "# Locate_time/Num_occs = %.4f\n", (tot_time * 1000) / tot_numocc);
+    fprintf(stderr, "# (Load_time+Locate_time)/Num_occs = %.4f\n", ((tot_time+Load_time) * 1000) / tot_numocc);
 
     free(pattern);
 }
