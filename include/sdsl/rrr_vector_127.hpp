@@ -532,7 +532,7 @@ class select_support_rrr<t_b, 127, t_rac, t_k>
             rank -= bt;
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
             __uint128_t helper_btnr = bi_type::sdsl_to_gcc(btnr);
-            return (idx - 1) * t_bs + bi_type::sel(bi_type::nr_to_bin(bt, btnr), i - rank);
+            return (idx - 1) * t_bs + bi_type::sel(bi_type::nr_to_bin(bt, helper_btnr), i - rank);
         }
 
         size_type select0(size_type i)const
@@ -571,7 +571,7 @@ class select_support_rrr<t_b, 127, t_rac, t_k>
             rank -= (t_bs-bt);
             number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp-btnrlen, btnrlen);
             __uint128_t helper_btnr = bi_type::sdsl_to_gcc(btnr);
-            return (idx - 1) * t_bs + bi_type::sel(~((__uint128_t)bi_type::nr_to_bin(bt, btnr)), i - rank);
+            return (idx - 1) * t_bs + bi_type::sel(~((__uint128_t)bi_type::nr_to_bin(bt, helper_btnr)), i - rank);
         }
 
 
