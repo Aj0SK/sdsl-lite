@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include <fstream>
 #include <string>
 #include <sdsl/rrr_vector.hpp>
@@ -54,7 +55,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    typedef rrr_vector<BLOCK_SIZE, int_vector<>, RANK_SAMPLE_DENS> rrr_vec_type;
+    typedef rrr_vector<BLOCK_SIZE, int_vector<>, RANK_SAMPLE_DENS, ((CUTOFF>BLOCK_SIZE || BLOCK_SIZE == 15) ? BLOCK_SIZE : CUTOFF)> rrr_vec_type;
     typedef rrr_vec_type::select_1_type rrr_select_type;
     typedef rrr_vec_type::rank_1_type rrr_rank_type;
     bit_vector bv;
@@ -73,6 +74,7 @@ int main(int argc, char* argv[])
         cout << "# args = " << args << endl;
         cout << "# file_name = "  << argv[1] << endl;
         cout << "# block_size = " << BLOCK_SIZE << endl;
+        cout << "# cutoff = " << ((CUTOFF>BLOCK_SIZE || BLOCK_SIZE == 15) ? BLOCK_SIZE : CUTOFF) << endl;
         cout << "# sample_rate = "<< k << endl;
         cout << "# rrr_size = "   << size_in_bytes(rrr_vector) << endl;
         cout << "# bt_size = "    << size_in_bytes(rrr_vector.bt) << endl;

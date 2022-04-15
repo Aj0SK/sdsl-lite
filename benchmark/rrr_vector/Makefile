@@ -10,18 +10,21 @@ TC_PATHS:=$(call config_column,test_case.config,2)
 TC_IDS:=$(call config_ids,test_case.config)
 COMPILE_IDS:=$(call config_ids,compile_options.config)
 KS:=$(call config_ids,block_size.config)
+CUTOFFS:=$(call config_ids,cutoff.config)
 
 all: execs 
 
 input: bin/generate_rnd_bitvector $(TC_PATHS)
 
 RRR_EXECS = $(foreach K,$(KS),\
-			  $(foreach COMPILE_ID,$(COMPILE_IDS),bin/rrr_time_and_space_$(K).$(COMPILE_ID)))
+			 $(foreach C,$(CUTOFFS),\
+			  $(foreach COMPILE_ID,$(COMPILE_IDS),bin/rrr_time_and_space_$(K).$(C).$(COMPILE_ID))))
 
 RES_FILES = $(foreach TC_ID,$(TC_IDS),\
+			 $(foreach C,$(CUTOFFS),\
               $(foreach K,$(KS),\
 				$(foreach COMPILE_ID,$(COMPILE_IDS),\
-					results/$(TC_ID).$(K).$(COMPILE_ID))))
+					results/$(TC_ID).$(K).$(C).$(COMPILE_ID)))))
 						
 RES_FILE=results/all.txt
 
@@ -30,12 +33,13 @@ bin/generate_rnd_bitvector: ${SRC_DIR}/generate_rnd_bitvector.cpp
 	$(MY_CXX) -O3 $(CXX_FLAGS) $(SRC_DIR)/generate_rnd_bitvector.cpp -L$(LIB_DIR) -I$(INC_DIR) -o $@ $(LIBS)
 
 # Targets for the access/rank/select rrr_vector experiment
-# Format: bin/rrr_time_and_space_[R].[COMPILE_ID]
+# Format: bin/rrr_time_and_space_[R].[C].[COMPILE_ID]
 bin/rrr_time_and_space_%: $(SRC_DIR)/rrr_time_and_space.cpp 
-	$(eval K:=$(call dim,1,$*)) 
-	$(eval COMPILE_ID:=$(call dim,2,$*)) 
+	$(eval K:=$(call dim,1,$*))
+	$(eval C:=$(call dim,2,$*)) 
+	$(eval COMPILE_ID:=$(call dim,3,$*)) 
 	$(eval COMPILE_OPTIONS:=$(call config_select,compile_options.config,$(COMPILE_ID),2))
-	$(MY_CXX) $(CXX_FLAGS) $(COMPILE_OPTIONS) -DBLOCK_SIZE=$(K) -L$(LIB_DIR) \
+	$(MY_CXX) $(CXX_FLAGS) $(COMPILE_OPTIONS) -DBLOCK_SIZE=$(K) -DCUTOFF=$(C) -L$(LIB_DIR) \
 		  $(SRC_DIR)/rrr_time_and_space.cpp -I$(INC_DIR) -o $@ $(LIBS)
 
 execs: $(RRR_EXECS) 
@@ -48,14 +52,16 @@ timing: input execs $(RES_FILES)
 # Format: results/[TC_ID].[K].[COMPILE_ID]
 results/%: 
 	$(eval TC_ID:=$(call dim,1,$*)) 
-	$(eval K:=$(call dim,2,$*)) 
-	$(eval COMPILE_ID:=$(call dim,3,$*)) 
+	$(eval K:=$(call dim,2,$*))
+	$(eval C:=$(call dim,3,$*))
+	$(eval COMPILE_ID:=$(call dim,4,$*)) 
 	$(eval TC_PATH:=$(call config_select,test_case.config,$(TC_ID),2))
-	@echo "Running bin/rrr_time_and_space_$(K).$(COMPILE_ID) on $(TC_ID)"
+	@echo "Running bin/rrr_time_and_space_$(K).$(C).$(COMPILE_ID) on $(TC_ID)"
 	@echo "# TC_ID = $(TC_ID)" >> $@
 	@echo "# K = $(K)" >> $@
+	@echo "# C = $(C)" >> $@
 	@echo "# COMPILE_ID = $(COMPILE_ID)" >> $@
-	@bin/rrr_time_and_space_$(K).$(COMPILE_ID) $(TC_PATH) $(t) >> $@
+	@bin/rrr_time_and_space_$(K).$(C).$(COMPILE_ID) $(TC_PATH) $(t) >> $@
 
 # Target for generating a random bitvector of size SIZE and density DENSITY
 # Format: data/rnd_[DENSITY].[SIZE]

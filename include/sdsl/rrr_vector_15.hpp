@@ -48,9 +48,10 @@ namespace sdsl
  *    destination block. That can be done by using bit-parallelism on
  *    64-bit words.
 */
-template<class t_rac, uint16_t t_k>
-class rrr_vector<15, t_rac, t_k>
+template<class t_rac, uint16_t t_k, uint16_t t_hybrid>
+class rrr_vector<15, t_rac, t_k, t_hybrid>
 {
+        static_assert(t_hybrid == 15, "rrr_vector: no hybrid impl for 15 bit block.");
     public:
         typedef bit_vector::size_type                    size_type;
         typedef bit_vector::value_type                   value_type;
