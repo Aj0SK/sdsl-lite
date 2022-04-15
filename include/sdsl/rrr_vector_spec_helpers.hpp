@@ -252,11 +252,6 @@ class binomial31
 
         inline uint32_t nr_to_bin(uint8_t k, uint32_t nr) const
         {
-            if (is_hybrid && k >= cut_from && k <= cut_to)
-            {
-                return nr;
-            }
-
         #ifndef NO_MY_OPT
             if (k == 31)
             {
@@ -271,6 +266,11 @@ class binomial31
                 return (nr >= 30) ? (1ull << nr) : (1ull << (30 - nr - 1));
             }
         #endif
+
+            if (is_hybrid && k >= cut_from && k <= cut_to)
+            {
+                return nr;
+            }
 
             const uint32_t threshold = m_bin_30[k];
             uint32_t to_or = 0;
@@ -287,19 +287,19 @@ class binomial31
 
         inline uint32_t bin_to_nr(const uint32_t bin) const
         {
-            uint32_t k = __builtin_popcount(bin);
-
-            if (is_hybrid && k >= cut_from && k <= cut_to)
-            {
-                return bin;
-            }
-
         #ifndef NO_MY_OPT
             if ((bin == 0) || (bin == ((1ull << 31) - 1)))
             {
                 return 0;
             }
         #endif
+
+            uint32_t k = __builtin_popcount(bin);
+            if (is_hybrid && k >= cut_from && k <= cut_to)
+            {
+                return bin;
+            }
+
             uint32_t nr;
             if (bin & (1 << 30))
             {
@@ -487,19 +487,19 @@ class binomial63
 
             inline uint64_t bin_to_nr(const uint64_t bin) const
             {
-                const uint64_t k = __builtin_popcountll(bin);
-
-                if (is_hybrid && k >= cut_from && k <= cut_to)
-                {
-                    return bin;
-                }
-
             #ifndef NO_MY_OPT
                 if ((bin == 0) || (bin == ((1ull << 63) - 1)))
                 {
                     return 0;
                 }
             #endif
+
+                const uint64_t k = __builtin_popcountll(bin);
+
+                if (is_hybrid && k >= cut_from && k <= cut_to)
+                {
+                    return bin;
+                }
 
                 bool first_bit = bin & (1ull << 62);
                 bool second_bit = bin & (1ull << 61);
@@ -533,20 +533,6 @@ class binomial63
             //! (k, nr).
             inline bool decode_bit(uint16_t k, number_type nr, uint16_t off) const
             {
-            #ifndef NO_MY_OPT
-                if (k == 63)
-                {
-                    return 1;
-                }
-                else if (k == 0)
-                {
-                    return 0;
-                }
-                else if (k == 1)
-                {
-                    return (nr >= 60) ? (nr == off) : ((60 - nr - 1) == off);
-                }
-            #endif
                 return (nr_to_bin(k, nr) >> off) & static_cast<uint64_t>(1);
             }
 };
@@ -721,13 +707,6 @@ class binomial127
 
         inline __uint128_t bin_to_nr(const __uint128_t bin) const
         {
-            const int k = popcountllll(bin);
-
-            if (is_hybrid && k >= cut_from && k <= cut_to)
-            {
-                return bin;
-            }
-
         #ifndef NO_MY_OPT
             __uint128_t last = 1;
             last = last << 127;
@@ -737,6 +716,13 @@ class binomial127
                 return 0;
             }
         #endif
+
+            const int k = popcountllll(bin);
+
+            if (is_hybrid && k >= cut_from && k <= cut_to)
+            {
+                return bin;
+            }
             
             const __uint128_t one = 1;
             bool first_bit = bin & (one << 126);
