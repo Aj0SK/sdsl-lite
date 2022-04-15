@@ -178,7 +178,7 @@ class rrr_vector<127, t_rac, t_k, t_hybrid>
                 if (is_hybrid && x >= bi_type.cut_from && x <= bi_type.cut_to)
                 {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, t_bs);
-                    sum_rank += bi_type.popcountllll(bin);
+                    sum_rank += bi_type.popcountllll(bi_type.sdsl_to_gcc(bin));
                 }
                 else
                 {
@@ -207,7 +207,7 @@ class rrr_vector<127, t_rac, t_k, t_hybrid>
                 if (is_hybrid && x >= bi_type.cut_from && x <= bi_type.cut_to)
                 {
                     number_type bin = rrr_helper_type::decode_btnr(bv, pos, m_size - pos);
-                    sum_rank += bi_type.popcountllll(bin);
+                    sum_rank += bi_type.popcountllll(bi_type.sdsl_to_gcc(bin));
                 }
                 else
                 {
@@ -439,7 +439,7 @@ class rank_support_rrr<t_b, 127, t_rac, t_k, t_hybrid>
                 if (is_hybrid && r >= bi_type.cut_from && r <= bi_type.cut_to)
                 {
                     number_type btnr = rrr_helper_type::decode_btnr(m_v->m_btnr, btnrp, t_bs);
-                    rank += bi_type.popcountllll(btnr);
+                    rank += bi_type.popcountllll(bi_type.sdsl_to_gcc(btnr));
                 }
                 else
                 {
